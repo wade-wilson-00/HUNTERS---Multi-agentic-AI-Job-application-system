@@ -12,15 +12,17 @@ class Listener:
         with self.microphone as source:
             print("Adjusting for ambient noise... Please wait.")
             self.recognizer.adjust_for_ambient_noise(source, duration=1)
+            # Wait up to 2.5 seconds of silence before considering a sentence finished
+            self.recognizer.pause_threshold = 2.5
             print("Ready to listen.")
 
     def listen_and_save(self, output_filename="temp_audio.wav") -> str:
         """Listens to the microphone and saves the audio to a wav file."""
         with self.microphone as source:
-            print("\nListening...")
+            print("\nI'm Listening...")
             try:
-                # Listen for speech. Timeout if nothing is said after 5 seconds
-                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=15)
+                # Listen for speech. Timeout if nothing is said after 10 seconds. Max recording length is 60 seconds.
+                audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=60)
                 print("Processing audio...")
                 
                 # Save the audio data to a file

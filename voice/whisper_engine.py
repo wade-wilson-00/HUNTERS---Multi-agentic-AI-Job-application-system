@@ -5,9 +5,9 @@ class WhisperEngine:
     def __init__(self, model_size="base.en", device="cpu", compute_type="int8"):
         # We are using Google Speech Recognition as a fallback because 
         # faster-whisper installation is blocked by Windows Defender.
-        print("Initializing Speech-to-Text (Google Fallback Mode)...")
+        print("Initializing Speech-to-Text")
         self.recognizer = sr.Recognizer()
-        print("Speech-to-Text ready.")
+        print("Ready to Listen")
 
     def transcribe(self, audio_path: str) -> str:
         """Transcribes the audio file and returns the text using Google's API."""
