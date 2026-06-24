@@ -1,0 +1,22 @@
+# Core
+langgraph
+langchain-huggingface
+python-dotenv
+huggingface
+huggingface-hub
+
+# Voice
+faster-whisper
+pyttsx3
+SpeechRecognition
+pyaudio
+
+# Memory
+chromadb
+
+# CLI
+typer
+rich
+
+# MCP
+mcp
