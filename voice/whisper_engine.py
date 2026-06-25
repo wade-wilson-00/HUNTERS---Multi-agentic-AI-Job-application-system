@@ -3,8 +3,6 @@ import speech_recognition as sr
 
 class WhisperEngine:
     def __init__(self, model_size="base.en", device="cpu", compute_type="int8"):
-        # We are using Google Speech Recognition as a fallback because 
-        # faster-whisper installation is blocked by Windows Defender.
         print("Initializing Speech-to-Text")
         self.recognizer = sr.Recognizer()
         print("Ready to Listen")
@@ -27,7 +25,6 @@ class WhisperEngine:
             print(f"Could not request results from Google Speech Recognition service; {e}")
             return ""
 
-# Simple test if run directly
 if __name__ == "__main__":
     engine = WhisperEngine()
     print("Ready to transcribe.")
