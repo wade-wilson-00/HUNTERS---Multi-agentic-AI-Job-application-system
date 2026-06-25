@@ -2,7 +2,7 @@ import os
 from faster_whisper import WhisperModel
 
 class WhisperEngine:
-    def __init__(self, model_size="base.en", device="cpu", compute_type="int8"):
+    def __init__(self, model_size="small.en", device="cpu", compute_type="int8"):
        
         print(f"Loading Whisper model '{model_size}' (this may take a moment on first run)...")
         self.model = WhisperModel(
