@@ -18,18 +18,18 @@ console = Console()
 def start():
     """Starts the Hunter Voice Assistant Loop."""
     console.clear()
-    console.print(Panel.fit("[bold blue]Hunter System Initialization[/bold blue]", border_style="blue"))
+    console.print(Panel.fit("[bold blue]HUNTERS[/bold blue]", border_style="blue"))
     
-    with console.status("[bold green]Loading components...[/bold green]"):
+    with console.status("[bold green]Loading the System[/bold green]"):
         tts = TTSEngine()
         listener = Listener()
         whisper = WhisperEngine()
         hunter = HunterAgent()
         
     console.clear()
-    console.print(Panel("[bold green]System Ready. Press ENTER to speak, or type 'exit' to quit.[/bold green]"))
+    console.print(Panel("[bold green]System is now Ready. Press ENTER to speak, or type 'exit' to quit.[/bold green]"))
     
-    tts.speak("Hunter is online and ready.")
+    tts.speak("Let's get Started Sir...")
     
     while True:
         try:
