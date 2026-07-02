@@ -41,31 +41,31 @@ Hunter will listen, understand your intent, delegate tasks across a network of s
 ## 🧠 How It Works
 
 ```
-     🎙 You Speak
-          │
-          ▼
-   ┌──────────────┐
-   │   Listener    │  ← Captures microphone input
-   └──────┬───────┘
-          │
-          ▼
-   ┌──────────────┐
-   │  Transcriber  │  ← Converts speech to text (Google STT)
-   └──────┬───────┘
-          │
-          ▼
-   ┌──────────────┐
-   │  Hunter LLM   │  ← Meta Llama 3.1 via HuggingFace
-   │  (The Brain)  │     Processes intent, generates response
-   └──────┬───────┘
-          │
-          ▼
-   ┌──────────────┐
-   │   TTS Engine  │  ← Speaks the response aloud (Male voice)
-   └──────┬───────┘
-          │
-          ▼
-     🗣 You Hear Hunter's Response
+     🎙 You Speak (Voice Mode) / ⌨️ You Type (Text Mode)
+           │
+           ▼
+    ┌──────────────┐
+    │ VAD Listener │  ← Silero VAD detects voice (Voice Mode)
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │   Whisper    │  ← Fast offline transcription
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │  Hunter LLM  │  ← Meta Llama 3.1 via HuggingFace
+    │  (The Brain) │    Streams SSE response tokens
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │   Edge TTS   │  ← Asynchronously chunks and speaks
+    └──────┬───────┘
+           │
+           ▼
+      🗣 You Hear Hunter's Response (While it's still thinking!)
 ```
 
 ---
@@ -103,13 +103,13 @@ Hunter will listen, understand your intent, delegate tasks across a network of s
 </td>
 <td align="center" width="120">
 <br>🎙️
-<br><strong>Whisper / STT</strong>
-<br><sub>Speech-to-Text</sub>
+<br><strong>Whisper + VAD</strong>
+<br><sub>Silero VAD & local STT</sub>
 </td>
 <td align="center" width="120">
 <br>🗣️
-<br><strong>pyttsx3</strong>
-<br><sub>Text-to-Speech</sub>
+<br><strong>Edge TTS</strong>
+<br><sub>Streaming Neural TTS</sub>
 </td>
 <td align="center" width="120">
 <br>💻
@@ -139,9 +139,10 @@ hunters/
 │   └── researcher.py       # 🔜 AI trends & market research
 │
 ├── voice/
-│   ├── listener.py         # Microphone capture & audio recording
-│   ├── whisper_engine.py   # Speech-to-Text transcription
-│   └── tts.py              # Text-to-Speech engine (Male voice)
+│   ├── vad_listener.py     # Silero VAD continuous voice detection
+│   ├── whisper_engine.py   # Fast offline Whisper transcription
+│   ├── stream_tts.py       # Sentence chunker & Edge TTS API
+│   └── audio_stream.py     # miniaudio & async PyAudio playback
 │
 ├── graph/                  # 🔜 LangGraph workflow definitions
 ├── memory/                 # 🔜 ChromaDB vector stores
@@ -191,10 +192,12 @@ HUGGING_FACE_API=your_huggingface_api_key_here
 ### Run Hunter
 
 ```bash
-python app.py
+python app.py --mode voice  # or just python app.py and choose from menu
 ```
 
-Press **Enter**, speak your question, and Hunter will respond with a voice!
+The app supports two modes:
+- **Voice Mode**: Speak naturally. Hunter uses Silero VAD to know when you've stopped speaking and replies automatically.
+- **Text Mode**: Use standard keyboard input if you prefer not to talk, while still getting voice responses.
 
 ---
 
@@ -206,12 +209,12 @@ The foundational voice-to-voice loop is fully operational.
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Microphone Listener | ✅ Done | Captures voice input with ambient noise calibration |
-| Speech-to-Text | ✅ Done | Transcribes audio using Google Speech Recognition |
-| LLM Brain | ✅ Done | Meta Llama 3.1 (8B) via HuggingFace Inference API |
-| Text-to-Speech | ✅ Done | Male voice (Microsoft David) via pyttsx3 |
-| CLI Interface | ✅ Done | Beautiful terminal UI with Rich panels & Typer |
-| Voice Loop | ✅ Done | Continuous listen → think → speak cycle |
+| Microphone Listener | ✅ Done | Fast voice activity detection using **Silero VAD** |
+| Speech-to-Text | ✅ Done | Rapid local transcription using **Whisper** |
+| LLM Brain | ✅ Done | Meta Llama 3.1 (8B) via HuggingFace Inference API with **SSE streaming** |
+| Text-to-Speech | ✅ Done | Ultra-realistic, fast, streaming neural voice using **Edge TTS** |
+| CLI Interface | ✅ Done | Beautiful dual-mode (Voice/Text) terminal UI with Rich & Typer |
+| Voice Loop | ✅ Done | Fully asynchronous, non-blocking pipeline |
 | Jarvis Persona | ✅ Done | Witty, polite, British-style AI assistant personality |
 
 ---
