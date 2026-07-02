@@ -5,11 +5,20 @@ python-dotenv
 huggingface
 huggingface-hub
 
-# Voice
+# Voice — Streaming Pipeline
 faster-whisper
+edge-tts
+pyaudio
+numpy
+pydub
+
+# Voice — VAD
+torch
+silero-vad
+
+# Voice — Legacy (pyttsx3 + SpeechRecognition)
 pyttsx3
 SpeechRecognition
-pyaudio
 
 # Memory
 chromadb

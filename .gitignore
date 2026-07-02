@@ -1,3 +1,5 @@
 venv
 .env
 roadmap.md
+temp_audio.wav
+__pychache__

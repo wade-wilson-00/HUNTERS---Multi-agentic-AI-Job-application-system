@@ -1,5 +1,7 @@
 import os
+import numpy as np
 from faster_whisper import WhisperModel
+
 
 class WhisperEngine:
     def __init__(self, model_size="small.en", device="cpu", compute_type="int8"):
@@ -13,7 +15,7 @@ class WhisperEngine:
         print("Whisper STT engine ready.")
 
     def transcribe(self, audio_path: str) -> str:
-        """Transcribes the audio file and returns the text using local Whisper."""
+        """Transcribes the audio file and returns the text using local Whisper. (Legacy)"""
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
             
@@ -31,6 +33,35 @@ class WhisperEngine:
         except Exception as e:
             print(f"Whisper transcription error: {e}")
             return ""
+
+    def transcribe_buffer(self, audio_buffer: np.ndarray) -> str:
+        """
+        Transcribe directly from a numpy audio buffer (no file I/O).
+        
+        Args:
+            audio_buffer: float32 numpy array, 16kHz, mono, normalized [-1.0, 1.0]
+                          (exactly what VADListener.listen() returns)
+        
+        Returns:
+            str: Transcribed text, or empty string on error.
+        """
+        if audio_buffer is None or len(audio_buffer) == 0:
+            return ""
+        
+        try:
+            segments, info = self.model.transcribe(
+                audio_buffer,
+                beam_size=5,
+                language="en",
+                vad_filter=True,
+            )
+            
+            full_text = " ".join(segment.text.strip() for segment in segments)
+            return full_text.strip()
+        except Exception as e:
+            print(f"Whisper buffer transcription error: {e}")
+            return ""
+
 
 # Simple test if run directly
 if __name__ == "__main__":
