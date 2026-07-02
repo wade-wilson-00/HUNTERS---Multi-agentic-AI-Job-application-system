@@ -43,6 +43,7 @@ async def run_text_mode():
 
     # ── Greeting ──
     console.print(f"[bold blue]Hunter:[/bold blue] {HUNTER_GREETING}")
+    await asyncio.sleep(0.3)  # warm-up: let the event loop settle before first WebSocket
     play_task = asyncio.create_task(speaker.play_all())
     await tts.speak_full(HUNTER_GREETING)
     await play_task
@@ -130,7 +131,7 @@ async def run_voice_mode():
     # ── Greeting ──
     display.start_live()
     display.show_status("Speaking...")
-
+    await asyncio.sleep(0.3)  # warm-up: let the event loop settle before first WebSocket
     play_task = asyncio.create_task(speaker.play_all())
     await tts.speak_full(HUNTER_GREETING)
     await play_task
@@ -202,7 +203,9 @@ def start(
         console.clear()
 
     if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        # Use ProactorEventLoop (Windows default) — handles async DNS + WebSockets
+        # needed by Edge TTS. WindowsSelectorEventLoopPolicy breaks getaddrinfo.
+        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 
     if mode == "text":
         asyncio.run(run_text_mode())

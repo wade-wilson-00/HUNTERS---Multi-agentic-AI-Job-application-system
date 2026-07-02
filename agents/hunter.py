@@ -60,6 +60,9 @@ class HunterAgent:
             )
             
             async for chunk in stream:
+                # Guard: final chunks often have empty choices or None content
+                if not chunk.choices:
+                    continue
                 token = chunk.choices[0].delta.content
                 if token:
                     full_response += token
@@ -68,8 +71,8 @@ class HunterAgent:
             self.chat_history.append({"role": "assistant", "content": full_response})
         
         except Exception as e:
-            print(f"Error in streaming response: {e}")
-            yield "I'm sorry, sir. I encountered an error connecting to my server."
+            print(f"\nError in streaming response: {e}")
+            yield "I'm sorry, sir. It seems I've hit a snag. Please try again."
 
     def clear_history(self):
         """Reset conversation history, keeping the system prompt."""

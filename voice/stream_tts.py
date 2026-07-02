@@ -11,6 +11,7 @@ Flow:
 """
 
 import asyncio
+import traceback
 import edge_tts
 import miniaudio
 from io import BytesIO
@@ -88,7 +89,7 @@ class StreamingTTS:
     async def speak_sentence(self, text: str):
         """
         Synthesize a single sentence and stream audio to the speaker.
-        Audio starts playing as soon as the first chunk arrives from Edge TTS.
+        Retries up to 2 times on transient network errors.
         """
         if not text or not text.strip():
             return
@@ -96,42 +97,50 @@ class StreamingTTS:
         self._is_speaking = True
         loop = asyncio.get_event_loop()
 
-        try:
-            communicate = edge_tts.Communicate(
-                text=text,
-                voice=self.voice,
-                rate=self.rate,
-                volume=self.volume,
-            )
+        for attempt in range(3):  # retry up to 3 times
+            try:
+                communicate = edge_tts.Communicate(
+                    text=text,
+                    voice=self.voice,
+                    rate=self.rate,
+                    volume=self.volume,
+                    connect_timeout=10,
+                    receive_timeout=60,
+                )
 
-            # Collect audio chunks from Edge TTS (mp3 format)
-            audio_data = BytesIO()
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    audio_data.write(chunk["data"])
+                # Collect audio chunks from Edge TTS (mp3 format)
+                audio_data = BytesIO()
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        audio_data.write(chunk["data"])
 
-            # Decode MP3 to PCM16 in an executor so it NEVER blocks the async event loop
-            mp3_bytes = audio_data.getvalue()
-            if len(mp3_bytes) > 0:
-                def decode_audio():
-                    # miniaudio is incredibly fast and resamples on-the-fly
-                    decoded = miniaudio.decode(
-                        mp3_bytes, 
-                        nchannels=1, 
-                        sample_rate=SPEAKER_SAMPLE_RATE,
-                        output_format=miniaudio.SampleFormat.SIGNED16
-                    )
-                    return decoded.samples.tobytes()
+                # Decode MP3 to PCM16 in an executor
+                mp3_bytes = audio_data.getvalue()
+                if len(mp3_bytes) > 0:
+                    def decode_audio():
+                        decoded = miniaudio.decode(
+                            mp3_bytes,
+                            nchannels=1,
+                            sample_rate=SPEAKER_SAMPLE_RATE,
+                            output_format=miniaudio.SampleFormat.SIGNED16
+                        )
+                        return decoded.samples.tobytes()
 
-                pcm_data = await loop.run_in_executor(None, decode_audio)
+                    pcm_data = await loop.run_in_executor(None, decode_audio)
 
-                if self.speaker:
-                    await self.speaker.play(pcm_data)
+                    if self.speaker:
+                        await self.speaker.play(pcm_data)
+                break  # success — exit retry loop
 
-        except Exception as e:
-            print(f"Edge TTS error: {e}")
-        finally:
-            self._is_speaking = False
+            except Exception as e:
+                print(f"\n[Edge TTS] Attempt {attempt+1}/3 failed: {type(e).__name__}: {e}")
+                if attempt < 2:
+                    await asyncio.sleep(1.0)  # wait before retry
+                else:
+                    print("[Edge TTS] All retries exhausted. Skipping sentence.")
+                    traceback.print_exc()
+        
+        self._is_speaking = False
 
     async def speak_full(self, text: str):
         """
