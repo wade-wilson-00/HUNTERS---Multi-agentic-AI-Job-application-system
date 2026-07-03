@@ -178,7 +178,19 @@ async def stream_llm_to_speech(
     chunker = SentenceChunker()
     full_response = ""
     
-    loop = asyncio.get_event_loop()
+    sentence_queue = asyncio.Queue()
+
+    # Worker that processes sentences in order so it doesn't block the LLM token stream
+    async def tts_worker():
+        while True:
+            sentence = await sentence_queue.get()
+            if sentence is None:  # Sentinel
+                break
+            await tts.speak_sentence(sentence)
+            sentence_queue.task_done()
+
+    # Start the background worker
+    worker_task = asyncio.create_task(tts_worker())
     
     async for token in token_generator:
         full_response += token
@@ -192,17 +204,21 @@ async def stream_llm_to_speech(
         if sentence:
             if on_sentence:
                 on_sentence(sentence)
-            # Fire TTS for this sentence (runs in background)
-            await tts.speak_sentence(sentence)
+            # Push to background worker queue instead of awaiting directly
+            await sentence_queue.put(sentence)
 
     # Flush remaining text
     remaining = chunker.flush()
     if remaining:
         if on_sentence:
             on_sentence(remaining)
-        await tts.speak_sentence(remaining)
+        await sentence_queue.put(remaining)
 
-    # Signal end of playback
+    # Signal the worker to stop and wait for it to finish synthesizing all sentences
+    await sentence_queue.put(None)
+    await worker_task
+
+    # Signal end of playback to the speaker
     if tts.speaker:
         await tts.speaker.play(None)
 
