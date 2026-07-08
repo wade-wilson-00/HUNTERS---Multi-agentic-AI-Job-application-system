@@ -24,16 +24,8 @@ class HunterAgent:
         self.chat_history.append({"role": "user", "content": text})
         
         try:
-            response = client.chat_completion(
-                messages=self.chat_history,
-                model=self.model_id,
-                max_tokens=LLM_MAX_TOKENS,
-                temperature=LLM_TEMPERATURE,
-            )
-            
-            reply = response.choices[0].message.content.strip()
-            self.chat_history.append({"role": "assistant", "content": reply})
-            return reply
+            # Sync calls not supported on AsyncOpenAI, but we'll adapt since this is legacy mode
+            raise NotImplementedError("Blocking respond() not supported with AsyncOpenAI client. Use respond_stream().")
         except Exception as e:
             print(f"Error generating response: {e}")
             return "I'm sorry, sir. I encountered an error connecting to my server."
@@ -51,7 +43,7 @@ class HunterAgent:
         
         full_response = ""
         try:
-            stream = await client.chat_completion(
+            stream = await client.chat.completions.create(
                 messages=self.chat_history,
                 model=self.model_id,
                 max_tokens=LLM_MAX_TOKENS,

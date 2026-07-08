@@ -218,10 +218,6 @@ async def stream_llm_to_speech(
     await sentence_queue.put(None)
     await worker_task
 
-    # Signal end of playback to the speaker
-    if tts.speaker:
-        await tts.speaker.play(None)
-
     return full_response
 
 

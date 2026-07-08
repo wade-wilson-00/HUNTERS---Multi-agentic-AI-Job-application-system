@@ -1,14 +1,17 @@
 import os
 from dotenv import load_dotenv
-from huggingface_hub import AsyncInferenceClient
+from openai import AsyncOpenAI
 
 load_dotenv()
 
-api_key = os.getenv("HUGGING_FACE_API")
+api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
     raise EnvironmentError(
-        "Missing HUGGING_FACE_API key. "
-        "Please add it to your .env file: HUGGING_FACE_API=hf_..."
+        "Missing GROQ_API_KEY. "
+        "Please add it to your .env file: GROQ_API_KEY=gsk_..."
     )
 
-client = AsyncInferenceClient(api_key=api_key)
+client = AsyncOpenAI(
+    base_url="https://api.groq.com/openai/v1",
+    api_key=api_key
+)

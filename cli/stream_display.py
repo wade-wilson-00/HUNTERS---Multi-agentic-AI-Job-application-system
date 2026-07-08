@@ -82,8 +82,8 @@ class StreamDisplay:
 
         return Panel(
             table,
-            title="[bold blue]H U N T E R S[/bold blue]",
-            border_style="blue",
+            title="[bold #3b82f6]H U N T E R S[/bold #3b82f6]",
+            border_style="#3b82f6",
             padding=(1, 2),
         )
 

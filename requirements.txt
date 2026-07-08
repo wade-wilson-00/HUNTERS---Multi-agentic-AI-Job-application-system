@@ -1,34 +1,21 @@
 # Core
-langgraph
-langchain-huggingface
 python-dotenv
-huggingface
-huggingface-hub
+httpx
 
-# LiveKit — Voice Pipeline (WebRTC)
-livekit==1.1.12
-livekit-agents
-livekit-plugins-silero
-livekit-plugins-openai
+# LLM
+openai
 
-# Voice — Whisper STT
-faster-whisper
-
-# Voice — Edge TTS
+# Voice
 edge-tts
 miniaudio
-
-# Voice — Legacy (kept for reference)
 pyaudio
-pyttsx3
-SpeechRecognition
+soundfile
 
-# Memory
-chromadb
+# Server
+fastapi
+uvicorn
+websockets
 
 # CLI
 typer
 rich
-
-# MCP
-mcp

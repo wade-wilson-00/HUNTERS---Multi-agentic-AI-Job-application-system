@@ -6,6 +6,9 @@ All tunable parameters for voice pipeline, LLM, and CLI.
 # ─── Voice Pipeline Mode ──────────────────────────────────────────
 VOICE_MODE = "streaming"  # "streaming" (new) or "legacy" (old pyttsx3 pipeline)
 
+# ─── Server Configuration ─────────────────────────────────────────
+WS_SERVER_URL = "ws://127.0.0.1:8000/voice"
+
 # ─── VAD (Voice Activity Detection) ───────────────────────────────
 VAD_SAMPLE_RATE = 16000       # 16kHz — required by Silero VAD + Whisper
 VAD_CHUNK_MS = 32             # 32ms chunks for VAD processing
@@ -20,7 +23,7 @@ WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE_TYPE = "int8"
 
 # ─── LLM (HuggingFace) ───────────────────────────────────────────
-LLM_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+LLM_MODEL = "llama-3.1-8b-instant"
 LLM_MAX_TOKENS = 512
 LLM_TEMPERATURE = 0.7
 
