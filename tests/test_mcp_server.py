@@ -15,8 +15,8 @@ from mcp.client.stdio import stdio_client
 async def main():
     # Tell the MCP client how to spawn the server process
     server_params = StdioServerParameters(
-        command="python",
-        args=["mcp_servers/central_server.py"],
+        command=sys.executable,
+        args=["-m", "mcp_server.central_server"],
     )
 
     async with stdio_client(server_params) as (read, write):

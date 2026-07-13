@@ -1,14 +1,11 @@
 
+from mcp_server.central_server import mcp
 from pathlib import Path
-from mcp.server.fastmcp import FastMCP
 import pdfplumber
 import docx
 
-mcp = FastMCP("Hunters Central MCP Server")
-
-WORKSPACE_ROOT = Path(__file__).parent.parent
-
-SUPPORTED_FORMATS = [".pdf, .txt, .md, .docx"]
+WORKSPACE_ROOT = Path(__file__).parent.parent.parent
+SUPPORTED_FORMATS = [".pdf", ".txt", ".md", ".docx"]
 
 def _extract_text(file_path: Path) -> str:
     """Internal Helper - When necessary, extract text from the file depending
@@ -19,7 +16,7 @@ def _extract_text(file_path: Path) -> str:
     if ext == ".pdf":
         with pdfplumber.open(file_path) as pdf:
             return "\n".join(
-                page._extract_text() or "" for page in pdf.pages
+                page.extract_text() or "" for page in pdf.pages
         )
     
     elif ext == ".docx":
@@ -47,6 +44,7 @@ def read_resume() -> str:
             content = _extract_text(found_file)
 
             return f"[Source: {found_file.name}]\n\n{content}"
-            
+
     return ("No resume found in workspace_profile/. "
             "Please add a resume.pdf, resume.docx,resume.md, or resume.txt file there.")
+
