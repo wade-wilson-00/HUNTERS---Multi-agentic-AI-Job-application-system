@@ -19,3 +19,7 @@ websockets
 # CLI
 typer
 rich
+
+#mcp
+fastmcp
+langchain-mcp-adapters
