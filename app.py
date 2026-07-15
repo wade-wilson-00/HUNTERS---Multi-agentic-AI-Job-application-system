@@ -66,7 +66,7 @@ async def async_run_voice_mode():
             display.show_status("Ready (Speak now)")
             is_processing = False
 
-            while True:
+            while True: 
                 # ── 1. Listen (only when not processing) ───────────
                 display.show_status("Listening...")
                 audio_np = await vad.listen()

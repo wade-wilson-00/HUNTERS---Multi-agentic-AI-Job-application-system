@@ -1,5 +1,4 @@
-
-from mcp_server.central_server import mcp
+from mcp_server.mcp import mcp
 from pathlib import Path
 import pdfplumber
 import docx

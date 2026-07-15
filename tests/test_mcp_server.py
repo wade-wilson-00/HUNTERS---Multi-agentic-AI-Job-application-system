@@ -33,10 +33,18 @@ async def main():
                 print(f"   - {tool.name}: {tool.description}")
 
             # 3. Actually CALL the read_resume tool
-            print("\nCalling read_resume tool...")
-            result = await session.call_tool("read_resume", arguments={})
+            print("\n📄 Calling read_resume tool...")
+            resume_result = await session.call_tool("read_resume", arguments={})
             print("\n--- Resume Content ---")
-            print(result.content[0].text[:800] + "...")  # Print first 800 chars
+            print(resume_result.content[0].text[:400] + "...\n[TRUNCATED]")
+            print("--- End ---")
+
+            # 4. CALL the new search_web tool
+            print("\n🌐 Calling search_web tool...")
+            search_args = {"query": "Top AI Engineering news today", "max_results": 3}
+            search_result = await session.call_tool("search_web", arguments=search_args)
+            print("\n--- Web Search Results ---")
+            print(search_result.content[0].text)
             print("--- End ---")
 
 if __name__ == "__main__":
