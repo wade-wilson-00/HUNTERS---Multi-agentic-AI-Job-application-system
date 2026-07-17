@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode
+from langgraph.prebuilt import ToolNode, tools_condition
 from agents.graphs.hunter_state import HunterState
 from agents.graphs.planner import planner_node
 from agents.graphs.summary import summary_node
@@ -29,7 +29,6 @@ async def build_hunter_graph():
     workflow.add_edge(START, "planner")
 
     #Defining Conditional Edging routes
-
     #If Planner node returns a tool call go to tool node 
     #else if it returns text go to summary node
     workflow.add_conditional_edges(
@@ -44,6 +43,6 @@ async def build_hunter_graph():
 
     #After Summary Ends,the Graph flow is completed here
     workflow.add_edge("summary", END)
-
+    
     return workflow.compile()
 

@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from agents.llm import client
 from prompts.hunter_prompts import HUNTER_SYSTEM_PROMPT
 from config.settings import LLM_MODEL, LLM_MAX_TOKENS, LLM_TEMPERATURE
+from agents.graphs.hunter_graph import build_hunter_graph
+from langchain_core.messages import HumanMessage
 
 load_dotenv()
 
@@ -39,31 +41,30 @@ class HunterAgent:
             async for token in hunter.respond_stream("Find AI internships"):
                 print(token, end="", flush=True)
         """
+
+        graph = await build_hunter_graph()
         self.chat_history.append({"role": "user", "content": text})
         
-        full_response = ""
+        user_msg = HumanMessage(content=text)
+
         try:
-            stream = await client.chat.completions.create(
-                messages=self.chat_history,
-                model=self.model_id,
-                max_tokens=LLM_MAX_TOKENS,
-                temperature=LLM_TEMPERATURE,
-                stream=True,
-            )
+            print(f"Hunter is thinking....")
+            final_state = await graph.ainvoke({
+                "messages": [user_msg]
+            })
+
+            final_text = final_state["final_response"]
+
+            self.chat_history.append({
+                "role":"assistant",
+                "content": final_text
+            })
+
+            # Yield the final text back to the voice server
+            yield final_text
             
-            async for chunk in stream:
-                # Guard: final chunks often have empty choices or None content
-                if not chunk.choices:
-                    continue
-                token = chunk.choices[0].delta.content
-                if token:
-                    full_response += token
-                    yield token
-            
-            self.chat_history.append({"role": "assistant", "content": full_response})
-        
         except Exception as e:
-            print(f"\nError in streaming response: {e}")
+            print(f"\nError in graph execution: {e}")
             yield "I'm sorry, sir. It seems I've hit a snag. Please try again."
 
     def clear_history(self):

@@ -17,6 +17,8 @@
 [![Groq](https://img.shields.io/badge/Groq-Llama_3.1-f55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com)
 [![Sarvam AI](https://img.shields.io/badge/Sarvam_AI-STT-FF9900?style=for-the-badge)](https://www.sarvam.ai/)
 [![Rich](https://img.shields.io/badge/Rich-CLI_UI-4B0082?style=for-the-badge&logo=gnometerminal&logoColor=white)](https://github.com/Textualize/rich)
+[![FastMCP](https://img.shields.io/badge/FastMCP-Tooling-blue?style=for-the-badge)](https://github.com/jlowin/fastmcp)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agent_Loop-green?style=for-the-badge)](https://langchain.com)
 
 <br>
 
@@ -67,7 +69,8 @@ We recently rebuilt Hunter's voice pipeline from the ground up into a highly sca
             │
             ▼
      ┌──────────────┐
-     │   Groq LLM   │  ← Llama 3.1 8B streams SSE text tokens back to client
+     │ Hunter Graph │  ← LangGraph ReAct Loop (Planner ↔ Tools)
+     │ (ChatGroq)   │  ← FastMCP tools: read_resume, search_web
      └──────┬───────┘
             │
             ▼
@@ -103,14 +106,14 @@ We recently rebuilt Hunter's voice pipeline from the ground up into a highly sca
 <br><sub>WS Server</sub>
 </td>
 <td align="center" width="120">
-<img src="https://avatars.githubusercontent.com/u/126733545?s=48&v=4" width="48" height="48" alt="LangGraph" />
+<br>🧠
 <br><strong>LangGraph</strong>
 <br><sub>Agent Orchestration</sub>
 </td>
 <td align="center" width="120">
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sqlite/sqlite-original.svg" width="48" height="48" alt="SQLite" />
-<br><strong>ChromaDB</strong>
-<br><sub>Vector Memory</sub>
+<br>🔌
+<br><strong>FastMCP</strong>
+<br><sub>Stdio Tool Server</sub>
 </td>
 </tr>
 <tr>
@@ -245,23 +248,25 @@ The foundational voice-to-voice loop is fully operational.
 
 ---
 
-### 🔨 Week 2 — Hunter Supervisor + LangGraph `IN PROGRESS`
+### ✅ Week 2 — Hunter Supervisor + LangGraph `COMPLETED`
 
-Turning Hunter from a chatbot into a planner with intent detection and task delegation.
+Turning Hunter from a chatbot into a dynamic ReAct planner with intent detection and tool delegation.
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| LangGraph Integration | 🔜 Pending | Nodes, edges, state management, routing |
-| HunterState | 🔜 Pending | Shared state object (goals, tasks, reports) |
-| Intent Detection | 🔜 Pending | Parse natural language into structured intents |
-| Planning Layer | 🔜 Pending | Generate multi-step task plans from goals |
-| First LangGraph Workflow | 🔜 Pending | Hunter → Planner → Summary pipeline |
+| FastMCP Server | ✅ Done | Centralized stdio server exposing filesystem and web tools. |
+| Tool 1: read_resume | ✅ Done | Reads user profiles/resumes from PDF, DOCX, and MD files. |
+| Tool 2: search_web | ✅ Done | Uses Tavily API to fetch live internet results and news. |
+| LangGraph Core | ✅ Done | Replaced raw LLM streaming with a full `StateGraph` workflow. |
+| HunterState | ✅ Done | TypedDict memory tracking message history and final responses. |
+| Planner Node | ✅ Done | `ChatGroq` bound to MCP tools, handling reasoning and task planning. |
+| Summary Node | ✅ Done | Post-processing node to translate raw markdown/data into conversational speech. |
 
 ---
 
 ### 📌 Future Weeks `UPCOMING`
-*Week 3: Scout, Resume & Match Agents*
-*Week 4: MCP Real-World Tools (Browser, Notion, File System)*
+*Week 3: Human-In-The-Loop (HITL) & Sub-Agent Orchestration (Scout, Match)*
+*Week 4: MCP Advanced Real-World Tools (Browser, Notion, File System)*
 *Week 5: Apply & Outreach Automation*
 *Week 6: Fully Autonomous Mode*
 
