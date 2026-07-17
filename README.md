@@ -91,6 +91,42 @@ We recently rebuilt Hunter's voice pipeline from the ground up into a highly sca
 
 ---
 
+## 🧠 Hunter's LangGraph Architecture (New!)
+
+We've upgraded Hunter's brain from a simple LLM chat into a **ReAct (Reason + Act)** Agent using LangGraph. Hunter can now autonomously decide when to search the web, read your files, and execute tasks via MCP tools.
+
+```mermaid
+graph TD
+    User([🗣️ User Voice Input]) --> Intent
+    
+    subgraph HunterState [LangGraph: HunterState Memory]
+        Intent[1. Intent Node] --> Planner
+        
+        Planner[2. Planner Node <br/> Llama 3.1 8B] -- Tool Required --> ToolNode
+        ToolNode[3. Tool Execution Node] -- Returns Data --> Planner
+        
+        Planner -- Text Ready --> Summary
+        Summary[4. Summary Node <br/> Post-Processor]
+    end
+    
+    subgraph FastMCPServer [Central FastMCP Server]
+        ToolNode -. stdio .-> read_resume
+        ToolNode -. stdio .-> search_web
+    end
+    
+    Summary --> Out([🗣️ Voice Output])
+    
+    classDef llm fill:#f55036,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef state fill:#009688,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef mcp fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff;
+    
+    class Planner,Summary llm;
+    class Intent,ToolNode state;
+    class read_resume,search_web mcp;
+```
+
+---
+
 ## 🛠️ Tech Stack
 
 <table>
@@ -106,34 +142,34 @@ We recently rebuilt Hunter's voice pipeline from the ground up into a highly sca
 <br><sub>WS Server</sub>
 </td>
 <td align="center" width="120">
-<br>🧠
+<img src="https://avatars.githubusercontent.com/u/126733545?s=48&v=4" width="48" height="48" alt="LangGraph" />
 <br><strong>LangGraph</strong>
 <br><sub>Agent Orchestration</sub>
 </td>
 <td align="center" width="120">
-<br>🔌
+<img src="https://avatars.githubusercontent.com/u/76800726?s=48&v=4" width="48" height="48" alt="Anthropic/MCP" />
 <br><strong>FastMCP</strong>
 <br><sub>Stdio Tool Server</sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="120">
-<br>🚀
+<img src="https://avatars.githubusercontent.com/u/132448419?s=48&v=4" width="48" height="48" alt="Groq" />
 <br><strong>Groq</strong>
 <br><sub>Llama 3.1 8B</sub>
 </td>
 <td align="center" width="120">
-<br>🎙️
+<img src="https://avatars.githubusercontent.com/u/148766774?s=48&v=4" width="48" height="48" alt="Sarvam AI" />
 <br><strong>Sarvam AI</strong>
 <br><sub>Ultra-fast STT</sub>
 </td>
 <td align="center" width="120">
-<br>🗣️
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/windows8/windows8-original.svg" width="48" height="48" alt="Microsoft Edge" />
 <br><strong>Edge TTS</strong>
 <br><sub>Streaming Neural TTS</sub>
 </td>
 <td align="center" width="120">
-<br>💻
+<img src="https://avatars.githubusercontent.com/u/104924716?s=48&v=4" width="48" height="48" alt="Textualize Rich" />
 <br><strong>Rich</strong>
 <br><sub>CLI UI</sub>
 </td>
