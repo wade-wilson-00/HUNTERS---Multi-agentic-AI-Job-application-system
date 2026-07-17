@@ -17,19 +17,24 @@ def search_web(query: str, max_results: int=5) -> str:
     It uses Tavily API for accessing Web Search, use it safely and efficiently.
     You have to help users get more detailed information"""
 
-    response = tavily_client.search(
-        query=query,
-        max_results=max_results
-    )
+    try:
+        response = tavily_client.search(
+            query=query,
+            max_results=max_results
+        )
+        results = response.get("results", [])
+        if not results:
+            return "No results found for this query."
+            
+        formatted_results = []
+        
+        for result in results:
+            title = result.get("title", "No Title")
+            url = result.get("url", "No URL")
+            content = result.get("content", "No Content")
+            formatted_results.append(f"Title: {title}\nURL: {url}\nContent: {content}\n") 
+            
+        return "\n".join(formatted_results)
 
-    results = response.get("results",[])
-    formatted_results = []
-
-    for result in results:
-
-        title = result.get("title")
-        url = result.get("url")
-        content = result.get("content")
-        formatted_results.append(f"Title: {title}\nURL:{url}\nContent: {content}\n") 
-
-    return "\n".join(formatted_results)
+    except Exception as e:
+        return f"Search failed with error: {str(e)}"
