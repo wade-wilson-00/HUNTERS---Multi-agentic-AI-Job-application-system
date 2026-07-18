@@ -147,7 +147,7 @@ graph TD
 <br><sub>Agent Orchestration</sub>
 </td>
 <td align="center" width="120">
-<img src="https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg#/media/File:Model_Context_Protocol_logo.svg" width="48" height="48" alt="Anthropic/MCP" />
+<img src="https://upload.wikimedia.org/wikipedia/commons/e/eb/Model_Context_Protocol_logo.svg" width="48" height="48" alt="Anthropic/MCP" />
 <br><strong>FastMCP</strong>
 <br><sub>Stdio Tool Server</sub>
 </td>
@@ -159,17 +159,17 @@ graph TD
 <br><sub>Llama 3.1 8B</sub>
 </td>
 <td align="center" width="120">
-<img src="https://avatars.githubusercontent.com/u/148766774?s=48&v=4" width="48" height="48" alt="Sarvam AI" />
+<img src="https://img.shields.io/badge/Sarvam_AI-STT-FF9900?style=for-the-badge&logo=soundcharts&logoColor=white" width="120" height="35" alt="Sarvam AI" />
 <br><strong>Sarvam AI</strong>
 <br><sub>Ultra-fast STT</sub>
 </td>
 <td align="center" width="120">
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/windows8/windows8-original.svg" width="48" height="48" alt="Microsoft Edge" />
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/microsoftedge/microsoftedge-original.svg" width="48" height="48" alt="Microsoft Edge" />
 <br><strong>Edge TTS</strong>
 <br><sub>Streaming Neural TTS</sub>
 </td>
 <td align="center" width="120">
-<img src="https://avatars.githubusercontent.com/u/104924716?s=48&v=4" width="48" height="48" alt="Textualize Rich" />
+<img src="https://raw.githubusercontent.com/Textualize/rich/master/docs/source/_static/logo.svg" width="48" height="48" alt="Textualize Rich" />
 <br><strong>Rich</strong>
 <br><sub>CLI UI</sub>
 </td>
