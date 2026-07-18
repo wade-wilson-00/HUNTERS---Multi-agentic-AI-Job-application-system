@@ -142,34 +142,34 @@ graph TD
 <br><sub>WS Server</sub>
 </td>
 <td align="center" width="120">
-<img src="https://raw.githubusercontent.com/langchain-ai/langchain/master/docs/static/img/langchain.png" width="48" height="48" alt="LangGraph" />
+<img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/langgraph-color.svg" width="48" height="48" alt="LangGraph" />
 <br><strong>LangGraph</strong>
 <br><sub>Agent Orchestration</sub>
 </td>
 <td align="center" width="120">
-<img src="https://raw.githubusercontent.com/jlowin/fastmcp/main/docs/logo.png" onerror="this.src='https://avatars.githubusercontent.com/u/76800726?s=48&v=4'" width="48" height="48" alt="FastMCP" />
+<img src="https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg#/media/File:Model_Context_Protocol_logo.svg" width="48" height="48" alt="Anthropic/MCP" />
 <br><strong>FastMCP</strong>
 <br><sub>Stdio Tool Server</sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="120">
-<img src="https://groq.com/wp-content/uploads/2024/03/PBG-mark1-color.svg" width="48" height="48" alt="Groq" />
+<img src="https://gist.githubusercontent.com/benjamincrozat/d88ed912c89c1c8b8740a7b7d3232f37/raw/02ce4ad0d24ef2c68629067b05a5edb3d7cbabae/groq.svg" width="48" height="48" alt="Groq" />
 <br><strong>Groq</strong>
 <br><sub>Llama 3.1 8B</sub>
 </td>
 <td align="center" width="120">
-<img src="https://cdn.prod.website-files.com/6571a067edc1e95690b27b9a/6571a8f906f3630f57635697_sarvam-logo-dark.svg" onerror="this.src='https://avatars.githubusercontent.com/u/148766774?s=48&v=4'" width="48" height="48" alt="Sarvam AI" />
+<img src="https://avatars.githubusercontent.com/u/148766774?s=48&v=4" width="48" height="48" alt="Sarvam AI" />
 <br><strong>Sarvam AI</strong>
 <br><sub>Ultra-fast STT</sub>
 </td>
 <td align="center" width="120">
-<img src="https://upload.wikimedia.org/wikipedia/commons/9/98/Microsoft_Edge_logo_%282019%29.svg" width="48" height="48" alt="Microsoft Edge" />
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/windows8/windows8-original.svg" width="48" height="48" alt="Microsoft Edge" />
 <br><strong>Edge TTS</strong>
 <br><sub>Streaming Neural TTS</sub>
 </td>
 <td align="center" width="120">
-<img src="https://raw.githubusercontent.com/Textualize/rich/master/imgs/logo.svg" width="48" height="48" alt="Textualize Rich" />
+<img src="https://avatars.githubusercontent.com/u/104924716?s=48&v=4" width="48" height="48" alt="Textualize Rich" />
 <br><strong>Rich</strong>
 <br><sub>CLI UI</sub>
 </td>
