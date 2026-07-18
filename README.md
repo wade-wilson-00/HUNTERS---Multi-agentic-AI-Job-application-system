@@ -142,34 +142,34 @@ graph TD
 <br><sub>WS Server</sub>
 </td>
 <td align="center" width="120">
-<img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/langgraph-color.svg" width="48" height="48" alt="LangGraph" />
+<img src="brand_logos/langgraph.png" width="48" height="48" alt="LangGraph" />
 <br><strong>LangGraph</strong>
 <br><sub>Agent Orchestration</sub>
 </td>
 <td align="center" width="120">
-<img src="https://upload.wikimedia.org/wikipedia/commons/e/eb/Model_Context_Protocol_logo.svg" width="48" height="48" alt="Anthropic/MCP" />
+<img src="brand_logos/Model_Context_Protocol_logo-removebg-preview.png" width="48" height="48" alt="MCP" />
 <br><strong>FastMCP</strong>
 <br><sub>Stdio Tool Server</sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="120">
-<img src="https://gist.githubusercontent.com/benjamincrozat/d88ed912c89c1c8b8740a7b7d3232f37/raw/02ce4ad0d24ef2c68629067b05a5edb3d7cbabae/groq.svg" width="48" height="48" alt="Groq" />
+<img src="brand_logos/groq.png" width="48" height="48" alt="Groq" />
 <br><strong>Groq</strong>
 <br><sub>Llama 3.1 8B</sub>
 </td>
 <td align="center" width="120">
-<img src="https://img.shields.io/badge/Sarvam_AI-STT-FF9900?style=for-the-badge&logo=soundcharts&logoColor=white" width="120" height="35" alt="Sarvam AI" />
+<img src="brand_logos/sarvam-removebg-preview.png" width="48" height="48" alt="Sarvam AI" />
 <br><strong>Sarvam AI</strong>
 <br><sub>Ultra-fast STT</sub>
 </td>
 <td align="center" width="120">
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/microsoftedge/microsoftedge-original.svg" width="48" height="48" alt="Microsoft Edge" />
+<img src="brand_logos/edge-removebg-preview.png" width="48" height="48" alt="Microsoft Edge" />
 <br><strong>Edge TTS</strong>
 <br><sub>Streaming Neural TTS</sub>
 </td>
 <td align="center" width="120">
-<img src="https://raw.githubusercontent.com/Textualize/rich/master/docs/source/_static/logo.svg" width="48" height="48" alt="Textualize Rich" />
+<img src="brand_logos/richlogo_py_wide_featured-removebg-preview.png" width="90" height="48" alt="Rich" />
 <br><strong>Rich</strong>
 <br><sub>CLI UI</sub>
 </td>
