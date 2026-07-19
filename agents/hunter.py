@@ -1,25 +1,21 @@
 import os
 from dotenv import load_dotenv
-from agents.llm import client
-from prompts.hunter_prompts import HUNTER_SYSTEM_PROMPT
-from config.settings import LLM_MODEL, LLM_MAX_TOKENS, LLM_TEMPERATURE
+from config.settings import LLM_MODEL
 from agents.graphs.hunter_graph import build_hunter_graph
 from langchain_core.messages import HumanMessage
+from context.context_builder import HUNTER_FULL_CONTEXT
 
 load_dotenv()
 
 class HunterAgent:
     def __init__(self, model_id=None):
         self.model_id = model_id or LLM_MODEL
-        print(f"Initializing Hunter LLM via InferenceClient using {self.model_id}...")
+        print(f"Hunter is Getting Ready...")
+        # chat_history is a lightweight conversation log (user/assistant turns only).
+        # The full 5-layer context is injected by the Planner Node via HUNTER_FULL_CONTEXT.
         self.chat_history = []
-        
-        # System prompt from centralized prompts module
-        self.chat_history.append({
-            "role": "system",
-            "content": HUNTER_SYSTEM_PROMPT,
-        })
-        print("Hunter is ready.")
+        print(f"Hunter is ready.")
+        print(f" Profile: {len(HUNTER_FULL_CONTEXT)} chars loaded into context.")
 
     def respond(self, text: str) -> str:
         """Generate a complete response (blocking). Used in legacy mode."""
@@ -68,8 +64,8 @@ class HunterAgent:
             yield "I'm sorry, sir. It seems I've hit a snag. Please try again."
 
     def clear_history(self):
-        """Reset conversation history, keeping the system prompt."""
-        self.chat_history = [self.chat_history[0]]
+        """Reset conversation history (user/assistant turns only)."""
+        self.chat_history = []
 
 
 if __name__ == "__main__":
