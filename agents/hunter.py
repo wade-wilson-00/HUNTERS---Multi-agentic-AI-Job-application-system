@@ -39,26 +39,36 @@ class HunterAgent:
         """
 
         graph = await build_hunter_graph()
+
+        # Convert chat history to LangChain messages for graph memory
+        from langchain_core.messages import AIMessage
+        history_messages = []
+        for entry in self.chat_history:
+            if entry["role"] == "user":
+                history_messages.append(HumanMessage(content=entry["content"]))
+            elif entry["role"] == "assistant":
+                history_messages.append(AIMessage(content=entry["content"]))
+
+        # Add the current user message to history BEFORE invoking
         self.chat_history.append({"role": "user", "content": text})
-        
-        user_msg = HumanMessage(content=text)
+        history_messages.append(HumanMessage(content=text))
 
         try:
             print(f"Hunter is thinking....")
             final_state = await graph.ainvoke({
-                "messages": [user_msg]
+                "messages": history_messages  # Full conversation history
             })
 
             final_text = final_state["final_response"]
 
             self.chat_history.append({
-                "role":"assistant",
+                "role": "assistant",
                 "content": final_text
             })
 
             # Yield the final text back to the voice server
             yield final_text
-            
+
         except Exception as e:
             print(f"\nError in graph execution: {e}")
             yield "I'm sorry, sir. It seems I've hit a snag. Please try again."
