@@ -100,39 +100,45 @@ Hunter's brain is a **ReAct (Reason + Act)** Agent built on LangGraph — capabl
 
 ```mermaid
 graph TD
-    User(["🗣️ User Input"]) --> Planner
+    User([User Input]) --> Planner
 
-    subgraph Graph ["LangGraph — HunterState"]
-        Planner["Planner Node\nLlama 3.1 8B\n(ReAct Reasoning)"] -- Tool Call --> ToolNode
-        ToolNode["Tool Execution Node"] -- Result --> Planner
+    subgraph HunterGraph [LangGraph HunterState]
+        Planner["Planner Node<br/>Llama 3.1 8B<br/>ReAct Reasoning"] -- Tool Call --> ToolNode
+        ToolNode[Tool Execution Node] -- Result --> Planner
         Planner -- Response Ready --> Summary
-        Summary["Summary Node\n(Voice Post-Processor)"]
+        Summary["Summary Node<br/>Voice Post-Processor"]
     end
 
-    subgraph MCP ["Central FastMCP Server"]
-        ToolNode -. stdio .-> read_resume
-        ToolNode -. stdio .-> search_web
-        ToolNode -. stdio .-> search_past_memories
+    subgraph MCPServer [Central FastMCP Server]
+        read_resume[read_resume]
+        search_web[search_web]
+        search_past_memories[search_past_memories]
     end
 
-    subgraph Memory ["Dual Memory System"]
-        Summary -- Auto-Index Turn --> ChromaDB[("ChromaDB\nLong-Term Semantic Memory")]
-        Graph -- Checkpoint State --> SQLite[("SQLite\nShort-Term State Persistence")]
-        search_past_memories -. BGE Embed Query .-> ChromaDB
-        SQLite -. Reload on Restart .-> Graph
+    subgraph DualMemory [Dual Memory System]
+        ChromaDB[(ChromaDB Long-Term Memory)]
+        SQLite[(SQLite Short-Term State)]
     end
 
-    Summary --> Out(["🗣️ Voice Output"])
+    ToolNode -. stdio .-> read_resume
+    ToolNode -. stdio .-> search_web
+    ToolNode -. stdio .-> search_past_memories
 
-    classDef llm fill:#f55036,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef node fill:#009688,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef mcp fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef mem fill:#6929C4,stroke:#fff,stroke-width:2px,color:#fff;
+    Summary -- Auto-Index --> ChromaDB
+    Summary -- Checkpoint --> SQLite
+    search_past_memories -. BGE Embed Query .-> ChromaDB
+    SQLite -. Reload on Restart .-> Planner
+    Summary --> Out([Voice Output])
 
-    class Planner,Summary llm;
-    class ToolNode node;
-    class read_resume,search_web,search_past_memories mcp;
-    class ChromaDB,SQLite mem;
+    classDef llm fill:#f55036,stroke:#fff,stroke-width:2px,color:#fff
+    classDef node fill:#009688,stroke:#fff,stroke-width:2px,color:#fff
+    classDef mcp fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff
+    classDef mem fill:#6929C4,stroke:#fff,stroke-width:2px,color:#fff
+
+    class Planner,Summary llm
+    class ToolNode node
+    class read_resume,search_web,search_past_memories mcp
+    class ChromaDB,SQLite mem
 ```
 
 ### 🧠 Dual Memory — How It Works
