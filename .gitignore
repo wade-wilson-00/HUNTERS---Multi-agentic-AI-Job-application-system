@@ -5,4 +5,10 @@ temp_audio.wav
 __pychache__
 Dockerfile
 pipeline_evolution.md
-workspace_profile
+
+workspace_profie/*
+!workspace_profie/.gitkeep
+
+.data/
+
+

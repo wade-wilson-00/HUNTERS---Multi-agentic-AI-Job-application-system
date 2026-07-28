@@ -19,6 +19,9 @@
 [![Rich](https://img.shields.io/badge/Rich-CLI_UI-4B0082?style=for-the-badge&logo=gnometerminal&logoColor=white)](https://github.com/Textualize/rich)
 [![FastMCP](https://img.shields.io/badge/FastMCP-Tooling-blue?style=for-the-badge)](https://github.com/jlowin/fastmcp)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Agent_Loop-green?style=for-the-badge)](https://langchain.com)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Memory-E85D04?style=for-the-badge)](https://www.trychroma.com/)
+[![BGE](https://img.shields.io/badge/BGE--small--en-Embeddings-6929C4?style=for-the-badge)](https://huggingface.co/BAAI/bge-small-en-v1.5)
+[![SQLite](https://img.shields.io/badge/SQLite-State_Persistence-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
 
 <br>
 
@@ -91,39 +94,57 @@ We recently rebuilt Hunter's voice pipeline from the ground up into a highly sca
 
 ---
 
-## 🧠 Hunter's LangGraph Architecture (New!)
+## 🧠 Hunter's LangGraph Architecture
 
-We've upgraded Hunter's brain from a simple LLM chat into a **ReAct (Reason + Act)** Agent using LangGraph. Hunter can now autonomously decide when to search the web, read your files, and execute tasks via MCP tools.
+Hunter's brain is a **ReAct (Reason + Act)** Agent built on LangGraph — capable of autonomously reasoning, calling tools, and maintaining memory across restarts.
 
 ```mermaid
 graph TD
-    User([🗣️ User Voice Input]) --> Intent
-    
-    subgraph HunterState [LangGraph: HunterState Memory]
-        Intent[1. Intent Node] --> Planner
-        
-        Planner[2. Planner Node <br/> Llama 3.1 8B] -- Tool Required --> ToolNode
-        ToolNode[3. Tool Execution Node] -- Returns Data --> Planner
-        
-        Planner -- Text Ready --> Summary
-        Summary[4. Summary Node <br/> Post-Processor]
+    User(["🗣️ User Input"]) --> Planner
+
+    subgraph Graph ["LangGraph — HunterState"]
+        Planner["Planner Node\nLlama 3.1 8B\n(ReAct Reasoning)"] -- Tool Call --> ToolNode
+        ToolNode["Tool Execution Node"] -- Result --> Planner
+        Planner -- Response Ready --> Summary
+        Summary["Summary Node\n(Voice Post-Processor)"]
     end
-    
-    subgraph FastMCPServer [Central FastMCP Server]
+
+    subgraph MCP ["Central FastMCP Server"]
         ToolNode -. stdio .-> read_resume
         ToolNode -. stdio .-> search_web
+        ToolNode -. stdio .-> search_past_memories
     end
-    
-    Summary --> Out([🗣️ Voice Output])
-    
+
+    subgraph Memory ["Dual Memory System"]
+        Summary -- Auto-Index Turn --> ChromaDB[("ChromaDB\nLong-Term Semantic Memory")]
+        Graph -- Checkpoint State --> SQLite[("SQLite\nShort-Term State Persistence")]
+        search_past_memories -. BGE Embed Query .-> ChromaDB
+        SQLite -. Reload on Restart .-> Graph
+    end
+
+    Summary --> Out(["🗣️ Voice Output"])
+
     classDef llm fill:#f55036,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef state fill:#009688,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef node fill:#009688,stroke:#fff,stroke-width:2px,color:#fff;
     classDef mcp fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff;
-    
+    classDef mem fill:#6929C4,stroke:#fff,stroke-width:2px,color:#fff;
+
     class Planner,Summary llm;
-    class Intent,ToolNode state;
-    class read_resume,search_web mcp;
+    class ToolNode node;
+    class read_resume,search_web,search_past_memories mcp;
+    class ChromaDB,SQLite mem;
 ```
+
+### 🧠 Dual Memory — How It Works
+
+Hunter has two independent memory systems working in parallel:
+
+| Memory Layer | Technology | Purpose |
+|---|---|---|
+| **Short-Term (State)** | SQLite + `AsyncSqliteSaver` | Persists the full LangGraph message state across restarts. Restart `app.py` and Hunter picks up right where it left off. |
+| **Long-Term (Semantic)** | ChromaDB + `BAAI/bge-small-en-v1.5` | Every completed conversation turn is embedded and indexed. Hunter can recall preferences, past searches, and prior context via `search_past_memories`. |
+
+**Flow:** After every turn, `summary_node` auto-indexes the conversation into ChromaDB via FastEmbed. When needed, the `search_past_memories` MCP tool performs a cosine-similarity semantic search to surface relevant past context.
 
 ---
 
@@ -182,41 +203,54 @@ graph TD
 
 ```
 hunters/
-├── app.py                  # Main CLI entry point (Voice/Text Client)
-├── server/
-│   ├── voice_server.py     # FastAPI WebSocket Server
-│   └── sarvam_stt.py       # Sarvam AI STT client
+├── app.py                        # CLI entry point — Voice/Text mode selector
 │
 ├── agents/
-│   ├── llm.py              # LLM inference setup (Groq)
-│   ├── hunter.py           # Hunter Agent (Jarvis-style supervisor)
-│   ├── scout.py            # 🔜 Job search & opportunity discovery
-│   ├── resume_analyzer.py  # 🔜 Resume parsing & strength analysis
-│   ├── match.py            # 🔜 Job-resume matching & ranking
-│   ├── apply.py            # 🔜 Automated job application agent
-│   ├── outreach.py         # 🔜 Recruiter outreach & cold emails
-│   ├── tracker.py          # 🔜 Application status tracking
-│   └── researcher.py       # 🔜 AI trends & market research
+│   ├── hunter.py                 # HunterAgent — orchestrates the LangGraph run
+│   └── graphs/
+│       ├── hunter_graph.py       # Graph builder — MCP client, nodes, edges
+│       ├── hunter_state.py       # HunterState TypedDict (messages, intent, response)
+│       ├── planner.py            # Planner node — ReAct reasoning, tool binding
+│       ├── summary.py            # Summary node — voice post-processor + memory indexing
+│       └── groq_llm.py           # Shared ChatGroq LLM instance
+│
+├── context/
+│   ├── context_builder.py        # Lean system prompt builder (5-layer, tool-first)
+│   └── memory_store.py           # ChromaDB + BGE-small-en embeddings (long-term memory)
+│
+├── mcp_server/
+│   ├── central_server.py         # FastMCP stdio server — registers all tools
+│   └── tools/
+│       ├── resume_read.py        # read_resume — reads workspace_profile/ files
+│       ├── web_search.py         # search_web — Tavily live internet search
+│       └── memory_tool.py        # search_past_memories — Chroma semantic search
+│
+├── server/
+│   ├── voice_server.py           # FastAPI WebSocket server (Voice Mode)
+│   └── sarvam_stt.py             # Sarvam AI STT client
 │
 ├── voice/
-│   ├── vad_listener.py     # Silero VAD continuous voice detection
-│   ├── stream_tts.py       # Sentence chunker & Edge TTS API
-│   └── audio_stream.py     # miniaudio & async PyAudio playback
+│   ├── vad_listener.py           # Silero VAD continuous voice detection
+│   ├── stream_tts.py             # Sentence chunker & Edge TTS streaming
+│   └── audio_stream.py           # Async miniaudio concurrent playback
 │
-├── graph/                  # 🔜 LangGraph workflow definitions
-├── memory/                 # 🔜 ChromaDB vector stores
-├── tools/                  # 🔜 MCP tool integrations
-├── mcp_servers/            # 🔜 MCP server configs (Browser, FS, Notion, Gmail)
-├── prompts/                # 🔜 Agent system prompts library
-├── templates/              # 🔜 Resume/cover letter generation templates
-├── reports/                # 🔜 Agent-generated evidence reports
-├── workspace/              # 🔜 Working directory for agents
-├── tests/                  # 🔜 Unit & integration tests
+├── workspace_profile/            # Drop your resume/portfolio here (not committed)
+│   └── resume.md
+│
+├── .data/                        # Runtime data (not committed)
+│   ├── hunter_state.db           # SQLite — short-term state persistence
+│   └── chroma_db/                # ChromaDB — long-term semantic memory
+│
+├── config/
+│   └── settings.py               # App-wide constants (model IDs, paths, URLs)
+│
+├── sub_agents/                   # 🔜 Scout, Match, Apply, Outreach agents
+├── prompts/                      # 🔜 Agent system prompts library
+├── templates/                    # 🔜 Cover letter & resume templates
+├── tests/                        # 🔜 Unit & integration tests
 │
 ├── requirements.txt
-├── roadmap.md
-├── system_architecure.md
-└── .env                    # API keys (not committed)
+└── .env                          # API keys (never committed)
 ```
 
 ---
@@ -300,11 +334,27 @@ Turning Hunter from a chatbot into a dynamic ReAct planner with intent detection
 
 ---
 
-### 📌 Future Weeks `UPCOMING`
-*Week 3: Human-In-The-Loop (HITL) & Sub-Agent Orchestration (Scout, Match)*
-*Week 4: MCP Advanced Real-World Tools (Browser, Notion, File System)*
-*Week 5: Apply & Outreach Automation*
-*Week 6: Fully Autonomous Mode*
+### ✅ Week 3 — Dual Memory System + Context Refactor `COMPLETED`
+
+Gave Hunter a persistent brain — short-term state that survives restarts and long-term semantic recall across conversations.
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Short-Term Memory | ✅ Done | `AsyncSqliteSaver` checkpoints the full LangGraph state to `.data/hunter_state.db` on every turn. Restart `app.py` and Hunter resumes the same thread seamlessly. |
+| Long-Term Memory | ✅ Done | Every completed turn is embedded with `BAAI/bge-small-en-v1.5` (via `fastembed`) and stored in a persistent **ChromaDB** vector database at `.data/chroma_db/`. |
+| `search_past_memories` Tool | ✅ Done | New MCP tool performs cosine-similarity semantic search over all past turns, letting Hunter recall preferences, prior searches, and context from any previous session. |
+| Auto-Indexing | ✅ Done | `summary_node` automatically indexes every turn after generating the voice response — zero manual steps required. |
+| Lean Context Builder | ✅ Done | Rewrote `context_builder.py` into a 5-layer, tool-first system prompt (~2k tokens). Raw resume content is no longer dumped into every request — Hunter calls `read_resume` on demand instead. |
+| Token Window Guard | ✅ Done | Planner node caps message history at the last 6 turns and truncates tool outputs beyond 1,500 chars, keeping requests comfortably under Groq's 6,000 TPM rate limit. |
+| Shared MCP Client | ✅ Done | Graph builder fetches tools once from a single MCP subprocess. `ToolNode` and `make_planner_node()` share the same list — no duplicate process spawns per turn. |
+
+---
+
+### 📌 Upcoming
+*Week 4: Sub-Agent Orchestration — Scout (job discovery) & Match (resume ranking)*
+*Week 5: MCP Advanced Tools — Browser automation, Notion, File System*
+*Week 6: Apply & Outreach Automation*
+*Week 7: Fully Autonomous Mode*
 
 ---
 
