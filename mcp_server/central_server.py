@@ -5,6 +5,7 @@ from mcp_server.mcp import mcp
 
 from mcp_server.tools import resume_read  
 from mcp_server.tools import web_search
+from mcp_server.tools import memory_tool
 
 if __name__ == "__main__":
     mcp.run(transport='stdio')

@@ -1,22 +1,26 @@
 from agents.graphs.hunter_state import HunterState
 from agents.graphs.groq_llm import chat_llm
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from context.memory_store import memory_store
 
 async def summary_node(state: HunterState) -> dict:
 
     prev_ai_message = None
+    user_input = ""
 
+    # Find last user input and previous AI message
     for msg in reversed(state["messages"]):
-        if isinstance(msg, AIMessage) and not msg.tool_calls:
+        if not user_input and isinstance(msg, HumanMessage):
+            user_input = msg.content
+        if not prev_ai_message and isinstance(msg, AIMessage) and not msg.tool_calls:
             prev_ai_message = msg
-            break
 
     if not prev_ai_message:
         return{
             "final_response": "I'm Sorry, I couldn't complete the task."
         }
     
-    voice_prompt = [
+    voice_prompt = [ 
         SystemMessage(content = (
             "You are Hunter, a JARVIS style AI assistant inspired from Iron Man. "
             "Convert the following content into natural spoken language. "
@@ -35,6 +39,16 @@ async def summary_node(state: HunterState) -> dict:
         HumanMessage(content = prev_ai_message.content)
     ]
     voice_response = await chat_llm.ainvoke(voice_prompt)
+
+    # Save turn to long-term semantic memory (Chroma DB)
+    if user_input and voice_response.content:
+        try:
+            memory_store.add_memory(
+                user_input=user_input,
+                assistant_response=voice_response.content
+            )
+        except Exception as e:
+            print(f"[MemoryStore] Warning: Failed to auto-index turn: {e}")
 
     return {
         "final_response": voice_response.content

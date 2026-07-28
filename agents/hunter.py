@@ -8,21 +8,16 @@ from context.context_builder import HUNTER_FULL_CONTEXT
 load_dotenv()
 
 class HunterAgent:
-    def __init__(self, model_id=None):
+    def __init__(self, model_id=None, session_id="default_session"):
         self.model_id = model_id or LLM_MODEL
+        self.session_id = session_id
         print(f"Hunter is Getting Ready...")
-        # chat_history is a lightweight conversation log (user/assistant turns only).
-        # The full 5-layer context is injected by the Planner Node via HUNTER_FULL_CONTEXT.
-        self.chat_history = []
         print(f"Hunter is ready.")
         print(f" Profile: {len(HUNTER_FULL_CONTEXT)} chars loaded into context.")
 
     def respond(self, text: str) -> str:
         """Generate a complete response (blocking). Used in legacy mode."""
-        self.chat_history.append({"role": "user", "content": text})
-        
         try:
-            # Sync calls not supported on AsyncOpenAI, but we'll adapt since this is legacy mode
             raise NotImplementedError("Blocking respond() not supported with AsyncOpenAI client. Use respond_stream().")
         except Exception as e:
             print(f"Error generating response: {e}")
@@ -31,51 +26,36 @@ class HunterAgent:
     async def respond_stream(self, text: str):
         """
         Asynchronous generator that yields tokens as they arrive from the LLM.
-        Uses HuggingFace AsyncInferenceClient with stream=True (SSE streaming).
-        
-        Usage:
-            async for token in hunter.respond_stream("Find AI internships"):
-                print(token, end="", flush=True)
+        Passes input to the LangGraph engine with persistent SQLite checkpointing.
         """
+        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+        from agents.graphs.hunter_graph import DB_PATH
 
-        graph = await build_hunter_graph()
+        async with AsyncSqliteSaver.from_conn_string(DB_PATH) as checkpointer:
+            graph = await build_hunter_graph(checkpointer=checkpointer)
+            config = {"configurable": {"thread_id": self.session_id}}
+            user_msg = HumanMessage(content=text)
 
-        # Convert chat history to LangChain messages for graph memory
-        from langchain_core.messages import AIMessage
-        history_messages = []
-        for entry in self.chat_history:
-            if entry["role"] == "user":
-                history_messages.append(HumanMessage(content=entry["content"]))
-            elif entry["role"] == "assistant":
-                history_messages.append(AIMessage(content=entry["content"]))
+            try:
+                print(f"Hunter is thinking....")
+                final_state = await graph.ainvoke(
+                    {"messages": [user_msg]},
+                    config=config
+                )
 
-        # Add the current user message to history BEFORE invoking
-        self.chat_history.append({"role": "user", "content": text})
-        history_messages.append(HumanMessage(content=text))
+                final_text = final_state.get("final_response", "")
 
-        try:
-            print(f"Hunter is thinking....")
-            final_state = await graph.ainvoke({
-                "messages": history_messages  # Full conversation history
-            })
+                # Yield the final text back to the voice server / CLI
+                yield final_text
 
-            final_text = final_state["final_response"]
-
-            self.chat_history.append({
-                "role": "assistant",
-                "content": final_text
-            })
-
-            # Yield the final text back to the voice server
-            yield final_text
-
-        except Exception as e:
-            print(f"\nError in graph execution: {e}")
-            yield "I'm sorry, sir. It seems I've hit a snag. Please try again."
+            except Exception as e:
+                print(f"\nError in graph execution: {e}")
+                yield "I'm sorry, sir. It seems I've hit a snag. Please try again."
 
     def clear_history(self):
-        """Reset conversation history (user/assistant turns only)."""
-        self.chat_history = []
+        """Reset session ID for clean history if needed."""
+        import uuid
+        self.session_id = f"session_{uuid.uuid4().hex[:8]}"
 
 
 if __name__ == "__main__":
