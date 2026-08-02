@@ -1,10 +1,10 @@
 from langchain_core.messages import SystemMessage
 from agents.graphs.hunter_state import HunterState
-from agents.graphs.groq_llm import chat_llm
+from agents.graphs.groq_llm import planner_llm
 from context.context_builder import HUNTER_FULL_CONTEXT
 
-HISTORY_WINDOW = 6        # rolling message cap — keeps tokens under Groq's 6k TPM limit
-MAX_CONTENT_CHARS = 1500  # truncation cap for oversized tool outputs (e.g. web search dumps)
+HISTORY_WINDOW = 2        # Dual memory covers older context — planner only needs immediate continuity
+MAX_CONTENT_CHARS = 800   # Tighter truncation cap for tool outputs
 
 
 def make_planner_node(tools: list):
@@ -12,7 +12,7 @@ def make_planner_node(tools: list):
     Factory that returns a planner_node coroutine pre-bound to the given tool list.
     Called once in build_hunter_graph() — no MCP subprocess is spawned here.
     """
-    llm_with_tools = chat_llm.bind_tools(tools)
+    llm_with_tools = planner_llm.bind_tools(tools)
 
     async def planner_node(state: HunterState):
         # ── Sliding window ────────────────────────────────────────────────
