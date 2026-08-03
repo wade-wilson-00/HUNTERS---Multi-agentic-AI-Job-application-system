@@ -33,7 +33,10 @@ class HunterAgent:
 
         async with AsyncSqliteSaver.from_conn_string(DB_PATH) as checkpointer:
             graph = await build_hunter_graph(checkpointer=checkpointer)
-            config = {"configurable": {"thread_id": self.session_id}}
+            config = {
+                "configurable": {"thread_id": self.session_id},
+                "recursion_limit": 6
+            }
             user_msg = HumanMessage(content=text)
 
             try:

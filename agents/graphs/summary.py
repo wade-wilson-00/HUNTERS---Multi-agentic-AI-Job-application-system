@@ -1,55 +1,63 @@
 from agents.graphs.hunter_state import HunterState
-from agents.graphs.groq_llm import summary_llm
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from context.memory_store import memory_store
 
-async def summary_node(state: HunterState) -> dict:
 
+async def summary_node(state: HunterState) -> dict:
+    """
+    Pass-through node — NO LLM call here.
+
+    Previously this called summary_llm.ainvoke() to rewrite the planner output
+    into Hunter's voice. That was the second of two API calls per turn, which
+    alone burned ~1,500 tokens and routinely caused 6k TPM 429 errors.
+
+    Now: the planner already outputs in Hunter's voice (personality merged into
+    the system prompt). This node just:
+      1. Extracts the planner's final response from state.
+      2. Writes the turn to ChromaDB for long-term memory.
+      3. Returns final_response to the graph.
+
+    If the resume was loaded for the first time this turn, it also caches it.
+    """
     prev_ai_message = None
     user_input = ""
+    tool_result_content = ""
 
-    # Find last user input and previous AI message
     for msg in reversed(state["messages"]):
         if not user_input and isinstance(msg, HumanMessage):
-            user_input = msg.content
+            user_input = msg.content if isinstance(msg.content, str) else ""
         if not prev_ai_message and isinstance(msg, AIMessage) and not msg.tool_calls:
             prev_ai_message = msg
 
     if not prev_ai_message:
-        return{
-            "final_response": "I'm Sorry, I couldn't complete the task."
-        }
-    
-    voice_prompt = [ 
-        SystemMessage(content = (
-            "You are Hunter, a JARVIS style AI assistant inspired from Iron Man. "
-            "Convert the following content into natural spoken language. "
-            "No markdown, no bullet points, no asterisks. "
-            "Write as if you are speaking directly to the user.\n\n"
-            "CRITICAL IDENTITY CORRECTION: "
-            "If the input text discusses a resume, background, or projects from their profile, "
-            "it belongs to the User, not you. "
-            "You MUST rewrite any first-person claims (e.g., 'my resume', 'I worked on') "
-            "to second-person (e.g., 'your resume', 'you worked on'). "
-            "Never claim the user's experiences as your own."
-            "You are a Confident Career Advisor and a Buddy as well to the user"
-            "Never address the user as 'User', address them with 'Sir'."
-            "Never Mention the Tools with it's name that you are given access with, always mention it as only 'Tools' and 'Resources'"
-        )),
-        HumanMessage(content = prev_ai_message.content)
-    ]
-    voice_response = await summary_llm.ainvoke(voice_prompt)
+        return {"final_response": "I'm sorry, I couldn't complete that task."}
 
-    # Save turn to long-term semantic memory (Chroma DB)
-    if user_input and voice_response.content:
+    response_text = prev_ai_message.content
+
+    # ── Cache resume if read_resume was called this turn ─────────────────────
+    # If the resume isn't cached yet, scan tool messages from this turn and
+    # store the result so the planner never has to call the tool again.
+    cached_resume = state.get("cached_resume", "")
+    if not cached_resume:
+        for msg in state["messages"]:
+            if hasattr(msg, "type") and msg.type == "tool":
+                content = getattr(msg, "content", "")
+                if isinstance(content, str) and content.startswith("[Source:"):
+                    tool_result_content = content
+                    break
+
+    updates: dict = {"final_response": response_text}
+    if tool_result_content:
+        updates["cached_resume"] = tool_result_content
+
+    # ── Auto-index turn to long-term semantic memory (ChromaDB) ──────────────
+    if user_input and response_text:
         try:
             memory_store.add_memory(
                 user_input=user_input,
-                assistant_response=voice_response.content
+                assistant_response=response_text,
             )
         except Exception as e:
             print(f"[MemoryStore] Warning: Failed to auto-index turn: {e}")
 
-    return {
-        "final_response": voice_response.content
-    }
+    return updates
