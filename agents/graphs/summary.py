@@ -1,6 +1,7 @@
 from agents.graphs.hunter_state import HunterState
 from langchain_core.messages import HumanMessage, AIMessage
 from context.memory_store import memory_store
+from langchain_core.messages import RemoveMessage
 
 
 async def summary_node(state: HunterState) -> dict:
@@ -58,6 +59,13 @@ async def summary_node(state: HunterState) -> dict:
                 assistant_response=response_text,
             )
         except Exception as e:
-            print(f"[MemoryStore] Warning: Failed to auto-index turn: {e}")
+           print(f"[MemoryStore] Warning: Failed to auto-index turn: {e}")
+    
+    #---- Dynamic Pruning and Summarization----
+    messages = state.get("messages", [])
+    if len(messages) > 6:
+        to_prune = messages[:-2]
 
+        prune = [RemoveMessage(id = m.id) for m in to_prune if getattr(m, "id", None)]
+        updates["messages"] = prune
     return updates
