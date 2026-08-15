@@ -40,16 +40,19 @@ def make_planner_node(tools: list):
             if not hasattr(msg, "content"):
                 sanitized.append(msg)
                 continue
+
+            # Target ONLY tool messages for truncation
+            is_tool = getattr(msg, "type", None) == "tool" or msg.__class__.__name__ == "ToolMessage"
                 
             raw_text = msg.content
             if isinstance(raw_text, list):
-                # Extract text blocks if content is a list of dicts (e.g., from ChromaDB)
+                # Extract text blocks if content is a list of dicts (e.g., from ChromaDB / MCP)
                 raw_text = " ".join(
                     block.get("text", "") if isinstance(block, dict) else str(block)
                     for block in raw_text
                 )
             
-            if isinstance(raw_text, str) and len(raw_text) > MAX_CONTENT_CHARS:
+            if is_tool and isinstance(raw_text, str) and len(raw_text) > MAX_CONTENT_CHARS:
                 clipped = msg.model_copy()
                 clipped.content = raw_text[:MAX_CONTENT_CHARS] + "\n...[truncated for brevity]"
                 sanitized.append(clipped)
