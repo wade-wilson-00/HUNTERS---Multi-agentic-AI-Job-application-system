@@ -356,11 +356,57 @@ Gave Hunter a persistent brain — short-term state that survives restarts and l
 
 ---
 
+### ✅ Week 4 — Memory Architecture Overhaul + Stability Fixes `COMPLETED`
+
+Hardened Hunter's entire memory system against token rate limits, infinite tool loops, database bloat, and retrieval blind spots — while laying the groundwork for multi-agent data pipelines.
+
+#### 🧠 Short-Term Memory (STM) Improvements
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| `AnyMessage` Schema Upgrade | ✅ Done | Switched `HunterState.messages` from abstract `BaseMessage` to `AnyMessage` (discriminated union). Enables accurate Pydantic deserialization from SQLite and clean static type checking for `.tool_calls`, `.tool_call_id`, etc. |
+| Explicit State Variables | ✅ Done | Added structured optional fields `target_role`, `preferred_role`, `active_company`, and `summary` to `HunterState`. Key domain facts are now first-class state citizens instead of buried in raw message history. |
+| Targeted Tool Truncation | ✅ Done | Planner node truncation now targets **only `ToolMessage` instances** via `is_tool` type check. `HumanMessage` and `AIMessage` pass through completely intact — preventing mid-sentence cuts on long user prompts or AI responses. |
+| List-Type Truncation Fix | ✅ Done | Updated truncation to normalize `list`-type tool content (MCP stdio returns structured content blocks). Any ChromaDB or web search result returned as a list of dicts is now correctly flattened and clipped at 800 chars. |
+| `RemoveMessage` State Pruning | ✅ Done | Integrated LangGraph's `RemoveMessage` sentinel into `summary_node`. When `len(messages) > 6`, old turns are permanently purged from SQLite using targeted `DELETE` operations, keeping the DB lean forever. |
+| Recursion Limit Circuit Breaker | ✅ Done | Added `recursion_limit: 6` to the LangGraph graph invocation config, capping the tool-call cycle at 3 tools per turn. Prevents infinite `search_past_memories` loops from cascading into 429 rate limit errors. |
+| Single LLM Instance | ✅ Done | Consolidated `planner_llm` and `summary_llm` into a single `hunter_llm` instance with `max_tokens=600`. Halved per-turn Groq API calls from 2 → 1, dropping TPM consumption from ~3,500 to ~2,100 tokens per turn. |
+| Resume State Caching | ✅ Done | `cached_resume` is stored in `HunterState` after the first `read_resume` call. The planner injects it directly into the system prompt on all future turns — the tool is never called again for the same session. |
+
+#### 🗃️ Long-Term Memory (LTM) — Phase 1: Core Restructuring
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Episodic Memory | ✅ Done | `add_episodic_memory()` stores high-level narrative summaries of conversation sessions with `memory_type: "episodic"` metadata tagging. Replaces verbatim turn dumps. |
+| Semantic Memory | ✅ Done | `add_semantic_memory()` stores atomic facts (skills, goals, preferences, constraints) with `memory_type: "semantic"` and `category` metadata. Enables precision retrieval of structured user facts. |
+| `summary_node` Episodic Indexing | ✅ Done | Every turn is now archived as a structured episodic summary with rich metadata before SQLite pruning — ensuring zero data loss between short-term and long-term memory layers. |
+
+#### 🔍 Long-Term Memory (LTM) — Phase 2: Hybrid Retrieval Engine
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| BM25 Sparse Search | ✅ Done | Integrated `rank-bm25` (`BM25Okapi`) for exact keyword and entity matching. Retrieves candidates that dense vector search misses (specific tool names, tech stacks, company names, dates). |
+| Dense Vector Search | ✅ Done | `BAAI/bge-small-en-v1.5` (384-dim) cosine similarity search via ChromaDB. Handles conceptual/semantic similarity queries. |
+| Reciprocal Rank Fusion (RRF) | ✅ Done | Fuses dense and sparse candidate scores using RRF with k=60 constant: `Score(d) = 1/(60 + rank_dense) + 1/(60 + rank_sparse)`. Final top-N candidates ranked by combined relevance score. |
+| `memory_type` Filter Support | ✅ Done | `hybrid_search()` supports optional `memory_type` filtering to scope queries to only `"semantic"` or `"episodic"` memory partitions. |
+
+#### 🔌 Long-Term Memory (LTM) — Phase 3: Tool Integration
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| `search_past_memories` Upgrade | ✅ Done | MCP tool updated to call `hybrid_search()`. Now supports optional `memory_type` parameter and returns results with structured labels (`[SEMANTIC (skills)]`, `[EPISODIC]`). |
+| System Prompt Tool Manifest | ✅ Done | `TOOL_MANIFEST_BLOCK` updated to inform Hunter about Hybrid Search capabilities and `memory_type` filtering syntax. |
+
+---
+
 ### 📌 Upcoming
-*Week 4: Sub-Agent Orchestration — Scout (job discovery) & Match (resume ranking)*
-*Week 5: MCP Advanced Tools — Browser automation, Notion, File System*
-*Week 6: Apply & Outreach Automation*
-*Week 7: Fully Autonomous Mode*
+
+| Week | Goal | Description |
+|------|------|-------------|
+| **Week 5** | **Multi-Agent Orchestration + Prompt Caching** | Build Scout Agent (job discovery), Match Agent (resume scoring), and wire them into Hunter's LangGraph as sub-graph nodes. Implement prompt caching to eliminate redundant token burns on stable system prompts. |
+| **Week 6** | MCP Advanced Tools | Browser automation, Notion integration, file system management. |
+| **Week 7** | Apply & Outreach Automation | Cover letter drafting, application submission, recruiter networking. |
+| **Week 8** | Fully Autonomous Mode | Hunter runs overnight job hunts, ranks & applies without any manual input. |
 
 ---
 
