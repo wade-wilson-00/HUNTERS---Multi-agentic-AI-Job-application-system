@@ -68,8 +68,7 @@ current job listings, company information, AI industry news, salary benchmarks, 
 - read_resume(file_name: str): Reads a file from the user's workspace_profile/ folder \
 (e.g., 'resume.md'). Use this whenever you need granular details about the user's background, skills, or projects.
 
-- search_past_memories(query: str): Searches long-term semantic memory stored in Chroma DB. \
-Use this whenever the user refers to previous conversations, past job search queries, or stored preferences.\
+- search_past_memories(query: str, memory_type: str = None): Searches long-term memory stored in Chroma DB using Hybrid Search (Dense Vector + BM25 Keyword Search). Use this whenever the user refers to previous conversations, past job search queries, stored preferences, or skills. Optional memory_type can be 'semantic' or 'episodic'.\
 """
 
 

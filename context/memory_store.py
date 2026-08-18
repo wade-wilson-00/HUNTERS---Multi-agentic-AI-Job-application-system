@@ -10,6 +10,13 @@ import chromadb
 from chromadb import EmbeddingFunction, Documents, Embeddings
 from fastembed import TextEmbedding
 
+import re
+from rank_bm25 import BM25Okapi
+
+def _tokenize(text: str) -> list[str]:
+    """Helper tokenizer for BM25 sparse search."""
+    return re.findall(r"\w+", text.lower())
+
 # Path to local persistent vector database
 DATA_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", ".data", "chroma_db")
@@ -100,31 +107,101 @@ class MemoryStore:
 
         return self.add_episodic_memory(summary_text=summary_text, metadata=meta)
 
-    def search_memories(self, query: str, n_results: int = 3) -> str:
-        """Searches past long-term memories relevant to the given query."""
+    def hybrid_search(self, query: str, n_results: int = 4, memory_type: str = None) -> str:
+        """
+        Executes Hybrid Search combining Dense Vector similarity (BGE-small) 
+        and Sparse Keyword matching (BM25Okapi) with Reciprocal Rank Fusion (RRF).
+        """
         if not query or self.collection.count() == 0:
             return "No previous memories found."
 
         try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=min(n_results, self.collection.count())
-            )
-            
-            docs = results.get("documents", [[]])[0]
-            metas = results.get("metadatas", [[]])[0]
-            
-            if not docs:
+            # 1. Fetch collection documents for sparse indexing
+            all_records = self.collection.get()
+            all_ids = all_records.get("ids", [])
+            all_docs = all_records.get("documents", [])
+            all_metas = all_records.get("metadatas", [])
+
+            if not all_docs:
                 return "No relevant memories found."
 
+            record_map = {
+                mem_id: (doc, meta)
+                for mem_id, doc, meta in zip(all_ids, all_docs, all_metas)
+            }
+
+            # Optional filter by memory_type
+            if memory_type:
+                filtered_ids = [
+                    mem_id for mem_id, (doc, meta) in record_map.items()
+                    if meta.get("memory_type") == memory_type
+                ]
+                if not filtered_ids:
+                    return f"No memories found matching type '{memory_type}'."
+            else:
+                filtered_ids = all_ids
+
+            filtered_docs = [record_map[m_id][0] for m_id in filtered_ids]
+
+            # ── A. Dense Vector Search (ChromaDB) ───────────────────────────
+            chroma_where = {"memory_type": memory_type} if memory_type else None
+            dense_results = self.collection.query(
+                query_texts=[query],
+                n_results=min(len(filtered_ids), self.collection.count()),
+                where=chroma_where
+            )
+            dense_ids = dense_results.get("ids", [[]])[0]
+
+            # ── B. Sparse BM25 Search ────────────────────────────────────────
+            tokenized_corpus = [_tokenize(doc) for doc in filtered_docs]
+            bm25 = BM25Okapi(tokenized_corpus)
+            tokenized_query = _tokenize(query)
+
+            bm25_scores = bm25.get_scores(tokenized_query)
+            ranked_bm25_indices = sorted(
+                range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True
+            )
+            sparse_ids = [filtered_ids[i] for i in ranked_bm25_indices if bm25_scores[i] > 0]
+
+            # ── C. Reciprocal Rank Fusion (RRF) ──────────────────────────────
+            rrf_scores = {}
+            k_constant = 60
+
+            # Rank scores from Dense Search
+            for rank, mem_id in enumerate(dense_ids):
+                rrf_scores[mem_id] = rrf_scores.get(mem_id, 0.0) + (1.0 / (k_constant + rank + 1))
+
+            # Rank scores from Sparse Search
+            for rank, mem_id in enumerate(sparse_ids):
+                rrf_scores[mem_id] = rrf_scores.get(mem_id, 0.0) + (1.0 / (k_constant + rank + 1))
+
+            # Sort candidate IDs by final RRF score
+            sorted_candidates = sorted(
+                rrf_scores.keys(), key=lambda mem_id: rrf_scores[mem_id], reverse=True
+            )[:n_results]
+
+            if not sorted_candidates:
+                return "No relevant memories found."
+
+            # ── D. Format Output ─────────────────────────────────────────────
             formatted = []
-            for doc, meta in zip(docs, metas):
+            for mem_id in sorted_candidates:
+                doc, meta = record_map[mem_id]
                 ts = meta.get("timestamp", "Unknown time")[:10]
-                formatted.append(f"[{ts}] {doc}")
-            
+                m_type = meta.get("memory_type", "memory").upper()
+                cat = meta.get("category", "")
+                cat_str = f" ({cat})" if cat else ""
+
+                formatted.append(f"[{ts} | {m_type}{cat_str}] {doc}")
+
             return "\n\n".join(formatted)
+
         except Exception as e:
-            return f"Error searching memories: {e}"
+            return f"Error executing hybrid memory search: {e}"
+
+    def search_memories(self, query: str, n_results: int = 4) -> str:
+        """Searches long-term memories using Hybrid Search (Dense + BM25 RRF)."""
+        return self.hybrid_search(query=query, n_results=n_results)
 
 # Singleton instance
 memory_store = MemoryStore()
