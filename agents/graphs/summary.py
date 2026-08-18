@@ -51,15 +51,19 @@ async def summary_node(state: HunterState) -> dict:
     if tool_result_content:
         updates["cached_resume"] = tool_result_content
 
-    # ── Auto-index turn to long-term semantic memory (ChromaDB) ──────────────
+    # ── Auto-index turn to long-term episodic memory (ChromaDB) ──────────────
     if user_input and response_text:
         try:
-            memory_store.add_memory(
-                user_input=user_input,
-                assistant_response=response_text,
+            summary_entry = f"User inquired: {user_input.strip()}\nHunter responded: {response_text.strip()}"
+            memory_store.add_episodic_memory(
+                summary_text=summary_entry,
+                metadata={
+                    "user_input": user_input[:200],
+                    "assistant_response": response_text[:200]
+                }
             )
         except Exception as e:
-           print(f"[MemoryStore] Warning: Failed to auto-index turn: {e}")
+            print(f"[MemoryStore] Warning: Failed to auto-index turn: {e}")
     
     #---- Dynamic Pruning and Summarization----
     messages = state.get("messages", [])

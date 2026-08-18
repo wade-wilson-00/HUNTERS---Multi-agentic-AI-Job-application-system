@@ -38,27 +38,67 @@ class MemoryStore:
             metadata={"hnsw:space": "cosine"}
         )
 
+    def add_episodic_memory(self, summary_text: str, metadata: dict = None) -> str:
+        """
+        Indexes a narrative summary of a conversation episode or session into Chroma DB.
+        """
+        if not summary_text or not summary_text.strip():
+            return ""
+
+        mem_id = f"ep_{uuid.uuid4().hex[:12]}"
+        meta = {
+            "memory_type": "episodic",
+            "timestamp": datetime.datetime.now().isoformat(),
+        }
+        if metadata:
+            meta.update(metadata)
+
+        self.collection.add(
+            documents=[summary_text.strip()],
+            metadatas=[meta],
+            ids=[mem_id]
+        )
+        return mem_id
+
+    def add_semantic_memory(self, fact_text: str, category: str = "general", metadata: dict = None) -> str:
+        """
+        Indexes an atomic fact, skill, preference, or goal into Chroma DB.
+        """
+        if not fact_text or not fact_text.strip():
+            return ""
+
+        mem_id = f"sem_{uuid.uuid4().hex[:12]}"
+        meta = {
+            "memory_type": "semantic",
+            "category": category,
+            "timestamp": datetime.datetime.now().isoformat(),
+        }
+        if metadata:
+            meta.update(metadata)
+
+        self.collection.add(
+            documents=[fact_text.strip()],
+            metadatas=[meta],
+            ids=[mem_id]
+        )
+        return mem_id
+
     def add_memory(self, user_input: str, assistant_response: str, metadata: dict = None):
-        """Indexes a conversation turn into Chroma DB."""
+        """
+        Backwards-compatible interface: converts a single turn into an episodic summary.
+        """
         if not user_input or not assistant_response:
             return
 
-        doc_text = f"User: {user_input.strip()}\nHunter: {assistant_response.strip()}"
-        mem_id = f"mem_{uuid.uuid4().hex[:12]}"
-        
+        summary_text = f"User inquired: {user_input.strip()}\nHunter responded: {assistant_response.strip()}"
         meta = {
-            "timestamp": datetime.datetime.now().isoformat(),
             "user_input": user_input[:200],
             "assistant_response": assistant_response[:200]
         }
         if metadata:
             meta.update(metadata)
 
-        self.collection.add(
-            documents=[doc_text],
-            metadatas=[meta],
-            ids=[mem_id]
-        )
+        return self.add_episodic_memory(summary_text=summary_text, metadata=meta)
 
     def search_memories(self, query: str, n_results: int = 3) -> str:
         """Searches past long-term memories relevant to the given query."""
