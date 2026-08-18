@@ -2,23 +2,20 @@ from agents.graphs.hunter_state import HunterState
 from langchain_core.messages import HumanMessage, AIMessage
 from context.memory_store import memory_store
 from langchain_core.messages import RemoveMessage
+from langchain_core.runnables import RunnableConfig
 
 
-async def summary_node(state: HunterState) -> dict:
+async def summary_node(state: HunterState, config: RunnableConfig) -> dict:
     """
-    Pass-through node — NO LLM call here.
+    Pass-through node — lightweight, no secondary LLM call.
 
-    Previously this called summary_llm.ainvoke() to rewrite the planner output
-    into Hunter's voice. That was the second of two API calls per turn, which
-    alone burned ~1,500 tokens and routinely caused 6k TPM 429 errors.
-
-    Now: the planner already outputs in Hunter's voice (personality merged into
-    the system prompt). This node just:
-      1. Extracts the planner's final response from state.
-      2. Writes the turn to ChromaDB for long-term memory.
-      3. Returns final_response to the graph.
-
-    If the resume was loaded for the first time this turn, it also caches it.
+    Responsibilities:
+      1. Extracts the planner's final AI response from state.
+      2. Calls smart_upsert_episodic_memory() to consolidate this session's
+         episodic summary in ChromaDB via an LLM-powered upsert (one stable
+         document per session_id — no overlap).
+      3. Caches the resume if read_resume was called for the first time.
+      4. Runs Dynamic Pruning (RemoveMessage) to keep SQLite lean.
     """
     prev_ai_message = None
     user_input = ""
@@ -51,19 +48,23 @@ async def summary_node(state: HunterState) -> dict:
     if tool_result_content:
         updates["cached_resume"] = tool_result_content
 
-    # ── Auto-index turn to long-term episodic memory (ChromaDB) ──────────────
+    # ── Smart Session-Based Episodic Memory Upsert ───────────────────────────
+    # Pull the thread_id (session_id) from LangGraph config so we can maintain
+    # one stable episodic document per session in ChromaDB.
     if user_input and response_text:
         try:
-            summary_entry = f"User inquired: {user_input.strip()}\nHunter responded: {response_text.strip()}"
-            memory_store.add_episodic_memory(
-                summary_text=summary_entry,
-                metadata={
-                    "user_input": user_input[:200],
-                    "assistant_response": response_text[:200]
-                }
+            session_id = (
+                config.get("configurable", {}).get("thread_id", "default_session")
+                if config else "default_session"
+            )
+            await memory_store.add_episodic_memory(
+                session_id=session_id,
+                user_input=user_input,
+                response_text=response_text,
             )
         except Exception as e:
-            print(f"[MemoryStore] Warning: Failed to auto-index turn: {e}")
+            print(f"[MemoryStore] Warning: Failed to upsert episodic memory: {e}")
+
     
     #---- Dynamic Pruning and Summarization----
     messages = state.get("messages", [])

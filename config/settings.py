@@ -22,8 +22,11 @@ WHISPER_MODEL = "small.en"
 WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE_TYPE = "int8"
 
-# ─── LLM (HuggingFace) ───────────────────────────────────────────
-LLM_MODEL = "llama-3.1-8b-instant"
+# ─── LLM ─────────────────────────────────────────────────────────
+# Switched from deprecated llama-3.1-8b-instant to Qwen 3.6 27B on Groq.
+# Qwen 3.6 27B offers significantly stronger reasoning and instruction following
+# while remaining within Groq's hosted inference tier.
+LLM_MODEL = "qwen/qwen3.6-27b"
 LLM_MAX_TOKENS = 512
 LLM_TEMPERATURE = 0.7
 

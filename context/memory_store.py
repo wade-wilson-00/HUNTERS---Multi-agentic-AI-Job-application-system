@@ -45,27 +45,90 @@ class MemoryStore:
             metadata={"hnsw:space": "cosine"}
         )
 
-    def add_episodic_memory(self, summary_text: str, metadata: dict = None) -> str:
-        """
-        Indexes a narrative summary of a conversation episode or session into Chroma DB.
-        """
-        if not summary_text or not summary_text.strip():
-            return ""
+    async def add_episodic_memory(
+        self,
+        session_id: str,
+        user_input: str,
+        response_text: str,
+    ) -> None:
+        """s
+        Session-Based Episodic Summarization with Upsert.
 
-        mem_id = f"ep_{uuid.uuid4().hex[:12]}"
+        On every turn this method:
+          1. Queries ChromaDB for an existing summary for this session_id.
+          2. If found  → calls hunter_llm to MERGE the new turn into the existing summary.
+          3. If absent → calls hunter_llm to generate a fresh summary of the first turn.
+          4. Upserts the result under a stable doc ID `ep_{session_id}`,
+             so only ONE episodic document exists per session — zero overlap.
+
+        Lazy-imports hunter_llm to avoid circular import at module load time.
+        """
+        if not user_input or not response_text:
+            return
+
+        # ── Lazy import to prevent circular dependency ────────────────────────
+        from agents.graphs.groq_llm import hunter_llm
+
+        doc_id = f"ep_{session_id}"
+        new_turn_text = (
+            f"User: {user_input.strip()}\n"
+            f"Hunter: {response_text.strip()}"
+        )
+
+        # ── 1. Check for existing session summary ─────────────────────────────
+        try:
+            existing = self.collection.get(ids=[doc_id])
+            existing_docs = existing.get("documents", [])
+            existing_summary = existing_docs[0] if existing_docs else None
+        except Exception:
+            existing_summary = None
+
+        # ── 2. Build the summarization prompt ─────────────────────────────────
+        if existing_summary:
+            prompt = (
+                "You are Hunter's episodic memory manager. Your job is to maintain "
+                "a concise, dense narrative summary of an ongoing conversation session.\n\n"
+                f"EXISTING SUMMARY:\n{existing_summary}\n\n"
+                f"NEW TURN TO INTEGRATE:\n{new_turn_text}\n\n"
+                "Update the summary by integrating the new turn naturally. "
+                "Preserve all previously mentioned goals, preferences, actions taken, "
+                "and outcomes. Do not repeat facts redundantly. Keep it under 120 words. "
+                "Output ONLY the updated summary text, nothing else."
+            )
+        else:
+            prompt = (
+                "You are Hunter's episodic memory manager. Summarize the following "
+                "conversation turn into a concise 2-3 sentence episodic memory. "
+                "Capture the user's intent, what Hunter did, and any key outcomes or "
+                "preferences mentioned. Keep it under 80 words. "
+                "Output ONLY the summary text, nothing else.\n\n"
+                f"CONVERSATION TURN:\n{new_turn_text}"
+            )
+
+        # ── 3. Call LLM for summarization ─────────────────────────────────────
+        try:
+            from langchain_core.messages import HumanMessage
+            llm_response = await hunter_llm.ainvoke([HumanMessage(content=prompt)])
+            summary_text = llm_response.content.strip()
+        except Exception as e:
+            print(f"[MemoryStore] Warning: LLM summarization failed, falling back to raw text: {e}")
+            summary_text = new_turn_text
+
+        if not summary_text:
+            return
+
+        # ── 4. Upsert into ChromaDB (stable session-scoped ID) ────────────────
         meta = {
             "memory_type": "episodic",
+            "session_id": session_id,
             "timestamp": datetime.datetime.now().isoformat(),
         }
-        if metadata:
-            meta.update(metadata)
-
-        self.collection.add(
-            documents=[summary_text.strip()],
+        self.collection.upsert(
+            documents=[summary_text],
             metadatas=[meta],
-            ids=[mem_id]
+            ids=[doc_id]
         )
-        return mem_id
+        print(f"[MemoryStore] Episodic memory upserted for session '{session_id}'.")
 
     def add_semantic_memory(self, fact_text: str, category: str = "general", metadata: dict = None) -> str:
         """
@@ -90,22 +153,6 @@ class MemoryStore:
         )
         return mem_id
 
-    def add_memory(self, user_input: str, assistant_response: str, metadata: dict = None):
-        """
-        Backwards-compatible interface: converts a single turn into an episodic summary.
-        """
-        if not user_input or not assistant_response:
-            return
-
-        summary_text = f"User inquired: {user_input.strip()}\nHunter responded: {assistant_response.strip()}"
-        meta = {
-            "user_input": user_input[:200],
-            "assistant_response": assistant_response[:200]
-        }
-        if metadata:
-            meta.update(metadata)
-
-        return self.add_episodic_memory(summary_text=summary_text, metadata=meta)
 
     def hybrid_search(self, query: str, n_results: int = 4, memory_type: str = None) -> str:
         """
