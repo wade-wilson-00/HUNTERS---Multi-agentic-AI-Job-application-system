@@ -130,28 +130,143 @@ class MemoryStore:
         )
         print(f"[MemoryStore] Episodic memory upserted for session '{session_id}'.")
 
-    def add_semantic_memory(self, fact_text: str, category: str = "general", metadata: dict = None) -> str:
-        """
-        Indexes an atomic fact, skill, preference, or goal into Chroma DB.
-        """
-        if not fact_text or not fact_text.strip():
-            return ""
-
+    # ── Private helper: raw ChromaDB write for a single semantic fact ─────────
+    def _store_fact(self, fact_text: str, category: str) -> str:
+        """Writes one atomic fact into ChromaDB. Called internally by add_semantic_memory."""
         mem_id = f"sem_{uuid.uuid4().hex[:12]}"
-        meta = {
-            "memory_type": "semantic",
-            "category": category,
-            "timestamp": datetime.datetime.now().isoformat(),
-        }
-        if metadata:
-            meta.update(metadata)
-
         self.collection.add(
             documents=[fact_text.strip()],
-            metadatas=[meta],
+            metadatas=[{
+                "memory_type": "semantic",
+                "category": category,
+                "timestamp": datetime.datetime.now().isoformat(),
+            }],
             ids=[mem_id]
         )
         return mem_id
+
+    async def add_semantic_memory(self, user_input: str, response_text: str) -> None:
+        """
+        Gemini 2.5 Flash-powered Semantic Fact Extraction.
+
+        On every turn this method:
+          1. Fetches all existing semantic facts from ChromaDB.
+          2. Sends existing facts + the current turn to Gemini 2.5 Flash (JSON mode).
+          3. Gemini returns {"add_facts": [...], "remove_ids": [...]}
+          4. Executes deletions of superseded/contradicted facts.
+          5. Writes each new fact via _store_fact().
+
+        Fact categories extracted: skill, target_role, location, preference,
+        constraint, experience.
+
+        Gracefully no-ops if Gemini is unavailable or returns malformed JSON.
+        """
+        if not user_input or not response_text:
+            return
+
+        import json
+        import google.generativeai as genai
+
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
+
+        # ── 1. Fetch existing semantic facts ──────────────────────────────────
+        existing_facts: list[dict] = []
+        try:
+            records = self.collection.get(
+                where={"memory_type": "semantic"}
+            )
+            ids   = records.get("ids", [])
+            docs  = records.get("documents", [])
+            metas = records.get("metadatas", [])
+            for mem_id, doc, meta in zip(ids, docs, metas):
+                existing_facts.append({
+                    "id":       mem_id,
+                    "category": meta.get("category", "general"),
+                    "text":     doc,
+                })
+        except Exception as e:
+            print(f"[MemoryStore] Warning: Could not fetch existing semantic facts: {e}")
+
+        # ── 2. Build Gemini prompt ─────────────────────────────────────────────
+        existing_block = "\n".join(
+            f"[{f['id']} | {f['category']}] {f['text']}"
+            for f in existing_facts
+        ) or "None yet."
+
+        prompt = (
+            "You are Hunter's semantic memory manager.\n\n"
+            "EXISTING SEMANTIC FACTS:\n"
+            f"{existing_block}\n\n"
+            "NEW CONVERSATION TURN:\n"
+            f"User: {user_input.strip()}\n"
+            f"Hunter: {response_text.strip()}\n\n"
+            "TASK:\n"
+            "Extract facts that are DEFINITIVELY stated (not inferred or assumed).\n"
+            "Valid categories: skill, target_role, location, preference, constraint, experience.\n\n"
+            "Rules:\n"
+            "- add_facts: only genuinely NEW facts not already captured above.\n"
+            "- remove_ids: only if this turn CONTRADICTS or fully SUPERSEDES an existing fact.\n"
+            "- If nothing new or to remove, return empty lists.\n\n"
+            "Return ONLY valid JSON in this exact schema:\n"
+            "{\n"
+            '  "add_facts": [{"category": "skill", "text": "..."}],\n'
+            '  "remove_ids": ["sem_abc123"]\n'
+            "}"
+        )
+
+        # ── 3. Call Gemini 2.5 Flash in JSON mode ─────────────────────────────
+        try:
+            model = genai.GenerativeModel(
+                model_name="gemini-3.6-flash",
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                    temperature=0.1,          # Low temp for deterministic extraction
+                    max_output_tokens=512,
+                ),
+            )
+            result = model.generate_content(prompt)
+            raw_text = result.text.strip()
+            # Clean potential Markdown codeblock wrapping
+            if raw_text.startswith("```"):
+                first_nl = raw_text.find("\n")
+                if first_nl != -1:
+                    raw_text = raw_text[first_nl:].strip()
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3].strip()
+            
+            try:
+                extraction = json.loads(raw_text)
+                # Handle double-encoded JSON strings returned by the model
+                if isinstance(extraction, str):
+                    extraction = json.loads(extraction)
+            except json.JSONDecodeError as jde:
+                print(f"[MemoryStore] JSON parsing failed. Raw response was:\n{raw_text}")
+                raise jde
+        except Exception as e:
+            print(f"[MemoryStore] Warning: Gemini fact extraction failed: {e}")
+            return
+
+        # ── 4. Delete superseded facts ─────────────────────────────────────────
+        remove_ids = extraction.get("remove_ids", [])
+        if remove_ids:
+            try:
+                self.collection.delete(ids=remove_ids)
+                print(f"[MemoryStore] Removed {len(remove_ids)} superseded semantic fact(s).")
+            except Exception as e:
+                print(f"[MemoryStore] Warning: Could not delete semantic facts: {e}")
+
+        # ── 5. Store new facts ─────────────────────────────────────────────────
+        add_facts = extraction.get("add_facts", [])
+        for fact in add_facts:
+            fact_text = fact.get("text", "").strip()
+            category  = fact.get("category", "general")
+            if fact_text:
+                self._store_fact(fact_text=fact_text, category=category)
+
+        if add_facts:
+            print(f"[MemoryStore] Stored {len(add_facts)} new semantic fact(s).")
+
+
 
 
     def hybrid_search(self, query: str, n_results: int = 4, memory_type: str = None) -> str:

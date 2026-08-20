@@ -65,7 +65,18 @@ async def summary_node(state: HunterState, config: RunnableConfig) -> dict:
         except Exception as e:
             print(f"[MemoryStore] Warning: Failed to upsert episodic memory: {e}")
 
-    
+        # ── Gemini Semantic Fact Extraction ──────────────────────────────────
+        # Runs after episodic upsert. Non-blocking — failure here never
+        # affects Hunter's response. Gemini extracts structured facts
+        # (skills, roles, locations, preferences) and deduplicates them.
+        try:
+            await memory_store.add_semantic_memory(
+                user_input=user_input,
+                response_text=response_text,
+            )
+        except Exception as e:
+            print(f"[MemoryStore] Warning: Failed to extract semantic facts: {e}")
+
     #---- Dynamic Pruning and Summarization----
     messages = state.get("messages", [])
     if len(messages) > 6:
@@ -74,3 +85,4 @@ async def summary_node(state: HunterState, config: RunnableConfig) -> dict:
         prune = [RemoveMessage(id = m.id) for m in to_prune if getattr(m, "id", None)]
         updates["messages"] = prune
     return updates
+

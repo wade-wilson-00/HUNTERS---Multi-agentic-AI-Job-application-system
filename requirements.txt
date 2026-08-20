@@ -4,6 +4,7 @@ httpx
 
 # LLM
 openai
+google-generativeai
 
 # Voice
 edge-tts
