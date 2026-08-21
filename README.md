@@ -14,7 +14,10 @@
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-WebSockets-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Groq](https://img.shields.io/badge/Groq-Llama_3.1-f55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com)
+[![Groq](https://img.shields.io/badge/Groq-Inference-f55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com)
+[![Qwen](https://img.shields.io/badge/Qwen-3.6_27B_Planner-6B21A8?style=for-the-badge&logo=alibabadotcom&logoColor=white)](https://huggingface.co/Qwen)
+[![Gemini](https://img.shields.io/badge/Gemini-3.6_Flash_Memory-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Cohere](https://img.shields.io/badge/Cohere-Neural_Reranker-D97706?style=for-the-badge)](https://cohere.com)
 [![Sarvam AI](https://img.shields.io/badge/Sarvam_AI-STT-FF9900?style=for-the-badge)](https://www.sarvam.ai/)
 [![Rich](https://img.shields.io/badge/Rich-CLI_UI-4B0082?style=for-the-badge&logo=gnometerminal&logoColor=white)](https://github.com/Textualize/rich)
 [![FastMCP](https://img.shields.io/badge/FastMCP-Tooling-blue?style=for-the-badge)](https://github.com/jlowin/fastmcp)
@@ -100,45 +103,75 @@ Hunter's brain is a **ReAct (Reason + Act)** Agent built on LangGraph — capabl
 
 ```mermaid
 graph TD
-    User([User Input]) --> Planner
+    User(["User Input"]) --> Planner
 
-    subgraph HunterGraph [LangGraph HunterState]
-        Planner["Planner Node<br/>Llama 3.1 8B<br/>ReAct Reasoning"] -- Tool Call --> ToolNode
-        ToolNode[Tool Execution Node] -- Result --> Planner
+    subgraph HunterGraph ["LangGraph HunterState"]
+        Planner["Planner Node\nQwen 3.6 27B\nReAct Reasoning"] -- Tool Call --> ToolNode
+        ToolNode["Tool Execution Node"] -- Result --> Planner
         Planner -- Response Ready --> Summary
-        Summary["Summary Node<br/>Voice Post-Processor"]
+        Summary["Summary Node\nVoice Post-Processor"]
     end
 
-    subgraph MCPServer [Central FastMCP Server]
-        read_resume[read_resume]
-        search_web[search_web]
-        search_past_memories[search_past_memories]
+    subgraph MCPServer ["Central FastMCP Server"]
+        read_resume["read_resume"]
+        search_web["search_web"]
+        search_past_memories["search_past_memories"]
     end
 
-    subgraph DualMemory [Dual Memory System]
-        ChromaDB[(ChromaDB Long-Term Memory)]
-        SQLite[(SQLite Short-Term State)]
+    subgraph MemoryWrite ["Write Path — After Every Turn"]
+        direction TB
+        EpisodicMerge["Phase 1: Episodic Merge\nGemini 3.6 Flash\nSingle-doc LLM Upsert"]
+        SemanticExtract["Phase 2: Semantic Extraction\nGemini 3.6 Flash JSON Mode\nFact Diff + Conflict Resolution"]
+        ChromaDB[("ChromaDB\nLong-Term Memory")]
+        EpisodicMerge --> ChromaDB
+        SemanticExtract --> ChromaDB
+    end
+
+    subgraph MemoryRead ["Read Path — On Demand"]
+        direction TB
+        BM25["BM25 Sparse Search"]
+        Dense["BGE-small Dense Search"]
+        RRF["RRF Fusion\ntop-15 pool"]
+        Cohere["Phase 3: Cohere Rerank\nrerank-english-v3.0\nNeural Cross-Encoder"]
+        BM25 --> RRF
+        Dense --> RRF
+        RRF --> Cohere
+    end
+
+    subgraph ShortTerm ["Short-Term State"]
+        SQLite[("SQLite\nCheckpoint Store")]
     end
 
     ToolNode -. stdio .-> read_resume
     ToolNode -. stdio .-> search_web
     ToolNode -. stdio .-> search_past_memories
 
-    Summary -- Auto-Index --> ChromaDB
+    Summary --> EpisodicMerge
+    Summary --> SemanticExtract
     Summary -- Checkpoint --> SQLite
-    search_past_memories -. BGE Embed Query .-> ChromaDB
+    search_past_memories --> BM25
+    search_past_memories --> Dense
+    Dense -. BGE Embed .-> ChromaDB
+    ChromaDB -. fetch docs .-> BM25
+    Cohere -- Top-N Results --> Planner
     SQLite -. Reload on Restart .-> Planner
-    Summary --> Out([Voice Output])
+    Summary --> Out(["Voice Output"])
 
     classDef llm fill:#f55036,stroke:#fff,stroke-width:2px,color:#fff
     classDef node fill:#009688,stroke:#fff,stroke-width:2px,color:#fff
     classDef mcp fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff
     classDef mem fill:#6929C4,stroke:#fff,stroke-width:2px,color:#fff
+    classDef gemini fill:#4285F4,stroke:#fff,stroke-width:2px,color:#fff
+    classDef cohere fill:#D97706,stroke:#fff,stroke-width:2px,color:#fff
+    classDef fusion fill:#166534,stroke:#fff,stroke-width:2px,color:#fff
 
     class Planner,Summary llm
     class ToolNode node
     class read_resume,search_web,search_past_memories mcp
     class ChromaDB,SQLite mem
+    class EpisodicMerge,SemanticExtract gemini
+    class Cohere cohere
+    class RRF fusion
 ```
 
 ### 🧠 Dual Memory — How It Works
@@ -148,9 +181,62 @@ Hunter has two independent memory systems working in parallel:
 | Memory Layer | Technology | Purpose |
 |---|---|---|
 | **Short-Term (State)** | SQLite + `AsyncSqliteSaver` | Persists the full LangGraph message state across restarts. Restart `app.py` and Hunter picks up right where it left off. |
-| **Long-Term (Semantic)** | ChromaDB + `BAAI/bge-small-en-v1.5` | Every completed conversation turn is embedded and indexed. Hunter can recall preferences, past searches, and prior context via `search_past_memories`. |
+| **Long-Term (Episodic)** | ChromaDB + Gemini 3.6 Flash | After every session, Gemini intelligently merges new conversation content into a single evolving episodic document — no bloat, no duplicates. |
+| **Long-Term (Semantic)** | ChromaDB + Gemini 3.6 Flash JSON Mode | Gemini extracts structured atomic facts (skills, goals, location, preferences) per turn. Stale/contradicted facts are automatically deleted and replaced. |
 
-**Flow:** After every turn, `summary_node` auto-indexes the conversation into ChromaDB via FastEmbed. When needed, the `search_past_memories` MCP tool performs a cosine-similarity semantic search to surface relevant past context.
+---
+
+## 🔍 Hybrid Storing & Retrieval — RAG for Your Career Data
+
+Hunter's long-term memory uses a **production-grade two-stage RAG pipeline** that ensures you always get the most accurate and relevant information recalled — not just the most recent or most verbatim-matched.
+
+### ✍️ Write Path — Smart Memory Storage (After Every Turn)
+
+Every session is processed by two parallel Gemini-powered pipelines:
+
+```
+summary_node
+  ├── Phase 1: add_episodic_memory()
+  │     └── Gemini 3.6 Flash reads existing episode + new session
+  │           → Merges into one coherent narrative document (upsert)
+  │           → ChromaDB always holds exactly ONE episodic doc
+  │
+  └── Phase 2: add_semantic_memory()
+        └── Gemini 3.6 Flash (JSON mode) reads existing facts + new turn
+              → Extracts: skill | target_role | location | preference | constraint | experience
+              → Deletes superseded/contradicted facts automatically
+              → Writes only genuinely new facts to ChromaDB
+```
+
+**Why this matters for you:** Hunter never stores stale data. If you say *"I've moved to Dubai"*, Gemini automatically removes your old Karachi location fact and stores the new one — no manual correction needed.
+
+### 🔎 Read Path — Two-Stage Retrieval (On Demand)
+
+When the Planner needs past context (via the `search_past_memories` MCP tool), it runs a two-stage retrieval pipeline:
+
+```
+Query: "What are my Python skills and job preferences?"
+  │
+  ├── Stage 1: Recall (wide net)
+  │     ├── A. Dense Search  — BGE-small-en embeddings via ChromaDB (semantic similarity)
+  │     ├── B. Sparse Search — BM25Okapi keyword matching (exact terms, tech names, dates)
+  │     └── C. RRF Fusion   — Reciprocal Rank Fusion combines both, pools top 15 candidates
+  │
+  └── Stage 2: Precision (neural cross-encoder)
+        └── Cohere rerank-english-v3.0 API
+              → Scores all 15 (query, document) pairs using a cross-encoder
+              → Returns top 4 by absolute relevance score
+              → Gracefully falls back to RRF if API unavailable
+```
+
+| Retrieval Dimension | Technology | What it catches |
+|---|---|---|
+| **Semantic Similarity** | BGE-small-en (dense vectors) | "job preferences" ↔ "career goals", conceptual matches |
+| **Keyword Matching** | BM25Okapi (sparse TF-IDF) | Exact tech names, dates, company names, numbers |
+| **Score Fusion** | Reciprocal Rank Fusion (k=60) | Best of both worlds — no single retriever blind spots |
+| **Neural Reranking** | Cohere `rerank-english-v3.0` | Understands full query intent, not just token overlap |
+
+**The result:** When you ask Hunter *"What job applications did I have in progress?"*, it doesn't just do a keyword search — it understands your intent, retrieves the 15 most plausible memories, then Cohere's cross-encoder picks the 4 that are *actually* relevant to that specific question.
 
 ---
 
@@ -181,10 +267,27 @@ Hunter has two independent memory systems working in parallel:
 </tr>
 <tr>
 <td align="center" width="120">
+<img src="https://qianwen-res.oss-cn-beijing.aliyuncs.com/logo/qwen.png" width="48" height="48" alt="Qwen" onerror="this.src='https://img.shields.io/badge/Qwen-27B-6B21A8?style=flat-square'" />
+<br><strong>Qwen</strong>
+<br><sub>3.6 27B Planner LLM</sub>
+</td>
+<td align="center" width="120">
+<img src="https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg" width="48" height="48" alt="Gemini" />
+<br><strong>Gemini</strong>
+<br><sub>3.6 Flash Memory AI</sub>
+</td>
+<td align="center" width="120">
+<img src="https://asset.brandfetch.io/idHMCKxoEf/idawOgEAPN.svg" width="48" height="48" alt="Cohere" />
+<br><strong>Cohere</strong>
+<br><sub>Neural Reranker</sub>
+</td>
+<td align="center" width="120">
 <img src="brand_logos/groq.png" width="48" height="48" alt="Groq" />
 <br><strong>Groq</strong>
-<br><sub>Llama 3.1 8B</sub>
+<br><sub>LLM Inference</sub>
 </td>
+</tr>
+<tr>
 <td align="center" width="120">
 <img src="brand_logos/sarvam-removebg-preview.png" width="48" height="48" alt="Sarvam AI" />
 <br><strong>Sarvam AI</strong>
@@ -199,6 +302,11 @@ Hunter has two independent memory systems working in parallel:
 <img src="brand_logos/richlogo_py_wide_featured-removebg-preview.png" width="90" height="48" alt="Rich" />
 <br><strong>Rich</strong>
 <br><sub>CLI UI</sub>
+</td>
+<td align="center" width="120">
+<img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" width="48" height="48" alt="BAAI BGE" />
+<br><strong>BGE-small-en</strong>
+<br><sub>384-dim Embeddings</sub>
 </td>
 </tr>
 </table>
@@ -373,29 +481,34 @@ Hardened Hunter's entire memory system against token rate limits, infinite tool 
 | Single LLM Instance | ✅ Done | Consolidated `planner_llm` and `summary_llm` into a single `hunter_llm` instance with `max_tokens=600`. Halved per-turn Groq API calls from 2 → 1, dropping TPM consumption from ~3,500 to ~2,100 tokens per turn. |
 | Resume State Caching | ✅ Done | `cached_resume` is stored in `HunterState` after the first `read_resume` call. The planner injects it directly into the system prompt on all future turns — the tool is never called again for the same session. |
 
-#### 🗃️ Long-Term Memory (LTM) — Phase 1: Core Restructuring
+#### 🗃️ Long-Term Memory — Phase 1: Smart Episodic Merge
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Episodic Memory | ✅ Done | `add_episodic_memory()` stores high-level narrative summaries of conversation sessions with `memory_type: "episodic"` metadata tagging. Replaces verbatim turn dumps. |
-| Semantic Memory | ✅ Done | `add_semantic_memory()` stores atomic facts (skills, goals, preferences, constraints) with `memory_type: "semantic"` and `category` metadata. Enables precision retrieval of structured user facts. |
-| `summary_node` Episodic Indexing | ✅ Done | Every turn is now archived as a structured episodic summary with rich metadata before SQLite pruning — ensuring zero data loss between short-term and long-term memory layers. |
+| LLM-Powered Episodic Upsert | ✅ Done | `add_episodic_memory()` refactored with a Gemini 3.6 Flash merge strategy. Checks ChromaDB for an existing episode; if found, sends both old + new session to Gemini which produces a single merged, coherent summary. The old doc is deleted and the merged version is upserted. Result: exactly **one** episodic document in ChromaDB at all times — no bloat. |
+| Zero Information Loss | ✅ Done | New session details are woven into the existing narrative rather than appended as a new document. No context is ever dropped between sessions. |
+| `summary_node` Integration | ✅ Done | `add_episodic_memory()` is called automatically after every completed turn — zero manual steps. |
 
-#### 🔍 Long-Term Memory (LTM) — Phase 2: Hybrid Retrieval Engine
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| BM25 Sparse Search | ✅ Done | Integrated `rank-bm25` (`BM25Okapi`) for exact keyword and entity matching. Retrieves candidates that dense vector search misses (specific tool names, tech stacks, company names, dates). |
-| Dense Vector Search | ✅ Done | `BAAI/bge-small-en-v1.5` (384-dim) cosine similarity search via ChromaDB. Handles conceptual/semantic similarity queries. |
-| Reciprocal Rank Fusion (RRF) | ✅ Done | Fuses dense and sparse candidate scores using RRF with k=60 constant: `Score(d) = 1/(60 + rank_dense) + 1/(60 + rank_sparse)`. Final top-N candidates ranked by combined relevance score. |
-| `memory_type` Filter Support | ✅ Done | `hybrid_search()` supports optional `memory_type` filtering to scope queries to only `"semantic"` or `"episodic"` memory partitions. |
-
-#### 🔌 Long-Term Memory (LTM) — Phase 3: Tool Integration
+#### 🧬 Long-Term Memory — Phase 2: Semantic Fact Extraction
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| `search_past_memories` Upgrade | ✅ Done | MCP tool updated to call `hybrid_search()`. Now supports optional `memory_type` parameter and returns results with structured labels (`[SEMANTIC (skills)]`, `[EPISODIC]`). |
-| System Prompt Tool Manifest | ✅ Done | `TOOL_MANIFEST_BLOCK` updated to inform Hunter about Hybrid Search capabilities and `memory_type` filtering syntax. |
+| Gemini JSON-Mode Extraction | ✅ Done | `add_semantic_memory()` refactored to call Gemini 3.6 Flash in strict JSON mode (`temperature=0.1`). Gemini sees all existing facts + new conversation turn and returns `{"add_facts": [...], "remove_ids": [...]}`. |
+| Automatic Conflict Resolution | ✅ Done | If a user updates their location, salary expectation, or role preference, Gemini automatically identifies the stale fact by ID and schedules it for deletion before writing the new one. Zero stale data. |
+| Structured Fact Categories | ✅ Done | Facts are stored with typed `category` metadata: `skill`, `target_role`, `location`, `preference`, `constraint`, `experience` — enabling precision category-scoped retrieval. |
+| `summary_node` Integration | ✅ Done | `add_semantic_memory()` runs in parallel with episodic indexing after every turn — both write paths fire automatically. |
+
+#### 🎯 Long-Term Memory — Phase 3: Cohere Neural Reranking
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Two-Stage `hybrid_search()` | ✅ Done | Refactored `hybrid_search()` to add Stage 2 Cohere reranking inline. Stage 1 (Dense + BM25 + RRF) pools top 15 candidates; Stage 2 sends them all to Cohere's `rerank-english-v3.0` cross-encoder for neural scoring. Returns top `n_results` by absolute relevance score. |
+| Cohere `rerank-english-v3.0` | ✅ Done | Uses Cohere's production neural reranking API — a cross-encoder that scores each (query, document) pair holistically, far beyond lexical or cosine similarity. |
+| BM25 Sparse Search | ✅ Done | `rank-bm25` (`BM25Okapi`) catches exact keyword matches (tech names, company names, dates) that dense vector search misses. |
+| Dense Vector Search | ✅ Done | `BAAI/bge-small-en-v1.5` (384-dim) handles conceptual/semantic similarity — *"career goals"* matching *"job preferences"*. |
+| RRF Fusion | ✅ Done | Reciprocal Rank Fusion (`k=60`) merges dense + sparse rankings into a unified top-15 recall pool before reranking. |
+| Graceful Fallback | ✅ Done | If `COHERE_API_KEY` is absent or the API call fails, `hybrid_search()` silently falls back to pure RRF ranking — no crash, no interruption. |
+| `search_past_memories` Tool | ✅ Done | MCP tool routes through the full two-stage pipeline. Supports optional `memory_type` filter to scope results to `"semantic"` or `"episodic"` partitions. |
 
 ---
 
