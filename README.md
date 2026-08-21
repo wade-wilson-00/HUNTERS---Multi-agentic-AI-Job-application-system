@@ -103,43 +103,43 @@ Hunter's brain is a **ReAct (Reason + Act)** Agent built on LangGraph — capabl
 
 ```mermaid
 graph TD
-    User(["User Input"]) --> Planner
+    User([User Input]) --> Planner
 
-    subgraph HunterGraph ["LangGraph HunterState"]
-        Planner["Planner Node\nQwen 3.6 27B\nReAct Reasoning"] -- Tool Call --> ToolNode
-        ToolNode["Tool Execution Node"] -- Result --> Planner
+    subgraph HunterGraph [LangGraph HunterState]
+        Planner["Planner Node<br/>Qwen 3.6 27B<br/>ReAct Reasoning"] -- Tool Call --> ToolNode
+        ToolNode[Tool Execution Node] -- Result --> Planner
         Planner -- Response Ready --> Summary
-        Summary["Summary Node\nVoice Post-Processor"]
+        Summary["Summary Node<br/>Voice Post-Processor"]
     end
 
-    subgraph MCPServer ["Central FastMCP Server"]
-        read_resume["read_resume"]
-        search_web["search_web"]
-        search_past_memories["search_past_memories"]
+    subgraph MCPServer [Central FastMCP Server]
+        read_resume[read_resume]
+        search_web[search_web]
+        search_past_memories[search_past_memories]
     end
 
-    subgraph MemoryWrite ["Write Path — After Every Turn"]
+    subgraph MemoryWrite [Write Path - After Every Turn]
         direction TB
-        EpisodicMerge["Phase 1: Episodic Merge\nGemini 3.6 Flash\nSingle-doc LLM Upsert"]
-        SemanticExtract["Phase 2: Semantic Extraction\nGemini 3.6 Flash JSON Mode\nFact Diff + Conflict Resolution"]
-        ChromaDB[("ChromaDB\nLong-Term Memory")]
+        EpisodicMerge["Phase 1: Episodic Merge<br/>Qwen 3.6 27B<br/>Single-doc LLM Upsert"]
+        SemanticExtract["Phase 2: Semantic Extraction<br/>Gemini 3.6 Flash JSON Mode<br/>Fact Diff + Conflict Resolution"]
+        ChromaDB[(ChromaDB Long-Term Memory)]
         EpisodicMerge --> ChromaDB
         SemanticExtract --> ChromaDB
     end
 
-    subgraph MemoryRead ["Read Path — On Demand"]
+    subgraph MemoryRead [Read Path - On Demand]
         direction TB
-        BM25["BM25 Sparse Search"]
-        Dense["BGE-small Dense Search"]
-        RRF["RRF Fusion\ntop-15 pool"]
-        Cohere["Phase 3: Cohere Rerank\nrerank-english-v3.0\nNeural Cross-Encoder"]
+        BM25[BM25 Sparse Search]
+        Dense[BGE-small Dense Search]
+        RRF["RRF Fusion<br/>top-15 pool"]
+        CohereNode["Phase 3: Cohere Rerank<br/>rerank-english-v3.0<br/>Neural Cross-Encoder"]
         BM25 --> RRF
         Dense --> RRF
-        RRF --> Cohere
+        RRF --> CohereNode
     end
 
-    subgraph ShortTerm ["Short-Term State"]
-        SQLite[("SQLite\nCheckpoint Store")]
+    subgraph ShortTerm [Short-Term State]
+        SQLite[(SQLite Checkpoint Store)]
     end
 
     ToolNode -. stdio .-> read_resume
@@ -153,14 +153,15 @@ graph TD
     search_past_memories --> Dense
     Dense -. BGE Embed .-> ChromaDB
     ChromaDB -. fetch docs .-> BM25
-    Cohere -- Top-N Results --> Planner
+    CohereNode -- Top-N Results --> Planner
     SQLite -. Reload on Restart .-> Planner
-    Summary --> Out(["Voice Output"])
+    Summary --> Out([Voice Output])
 
     classDef llm fill:#f55036,stroke:#fff,stroke-width:2px,color:#fff
     classDef node fill:#009688,stroke:#fff,stroke-width:2px,color:#fff
     classDef mcp fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff
     classDef mem fill:#6929C4,stroke:#fff,stroke-width:2px,color:#fff
+    classDef qwen fill:#6B21A8,stroke:#fff,stroke-width:2px,color:#fff
     classDef gemini fill:#4285F4,stroke:#fff,stroke-width:2px,color:#fff
     classDef cohere fill:#D97706,stroke:#fff,stroke-width:2px,color:#fff
     classDef fusion fill:#166534,stroke:#fff,stroke-width:2px,color:#fff
@@ -169,8 +170,9 @@ graph TD
     class ToolNode node
     class read_resume,search_web,search_past_memories mcp
     class ChromaDB,SQLite mem
-    class EpisodicMerge,SemanticExtract gemini
-    class Cohere cohere
+    class EpisodicMerge qwen
+    class SemanticExtract gemini
+    class CohereNode cohere
     class RRF fusion
 ```
 
@@ -181,7 +183,7 @@ Hunter has two independent memory systems working in parallel:
 | Memory Layer | Technology | Purpose |
 |---|---|---|
 | **Short-Term (State)** | SQLite + `AsyncSqliteSaver` | Persists the full LangGraph message state across restarts. Restart `app.py` and Hunter picks up right where it left off. |
-| **Long-Term (Episodic)** | ChromaDB + Gemini 3.6 Flash | After every session, Gemini intelligently merges new conversation content into a single evolving episodic document — no bloat, no duplicates. |
+| **Long-Term (Episodic)** | ChromaDB + Qwen 3.6 27B | After every session, Qwen intelligently merges new conversation content into a single evolving episodic document — no bloat, no duplicates. |
 | **Long-Term (Semantic)** | ChromaDB + Gemini 3.6 Flash JSON Mode | Gemini extracts structured atomic facts (skills, goals, location, preferences) per turn. Stale/contradicted facts are automatically deleted and replaced. |
 
 ---
@@ -192,12 +194,12 @@ Hunter's long-term memory uses a **production-grade two-stage RAG pipeline** tha
 
 ### ✍️ Write Path — Smart Memory Storage (After Every Turn)
 
-Every session is processed by two parallel Gemini-powered pipelines:
+Every session is processed by two parallel LLM-powered pipelines:
 
 ```
 summary_node
   ├── Phase 1: add_episodic_memory()
-  │     └── Gemini 3.6 Flash reads existing episode + new session
+  │     └── Qwen 3.6 27B reads existing episode + new session
   │           → Merges into one coherent narrative document (upsert)
   │           → ChromaDB always holds exactly ONE episodic doc
   │
@@ -208,7 +210,7 @@ summary_node
               → Writes only genuinely new facts to ChromaDB
 ```
 
-**Why this matters for you:** Hunter never stores stale data. If you say *"I've moved to Dubai"*, Gemini automatically removes your old Karachi location fact and stores the new one — no manual correction needed.
+**Why this matters for you:** Hunter never stores stale data. If you say *"I've moved to Dubai"*, Qwen/Gemini automatically removes your old Karachi location fact and stores the new one — no manual correction needed.
 
 ### 🔎 Read Path — Two-Stage Retrieval (On Demand)
 
@@ -267,7 +269,7 @@ Query: "What are my Python skills and job preferences?"
 </tr>
 <tr>
 <td align="center" width="120">
-<img src="https://qianwen-res.oss-cn-beijing.aliyuncs.com/logo/qwen.png" width="48" height="48" alt="Qwen" onerror="this.src='https://img.shields.io/badge/Qwen-27B-6B21A8?style=flat-square'" />
+<img src="brand_logos/qwen_logo.png" width="48" height="48" alt="Qwen" />
 <br><strong>Qwen</strong>
 <br><sub>3.6 27B Planner LLM</sub>
 </td>
@@ -277,7 +279,7 @@ Query: "What are my Python skills and job preferences?"
 <br><sub>3.6 Flash Memory AI</sub>
 </td>
 <td align="center" width="120">
-<img src="https://asset.brandfetch.io/idHMCKxoEf/idawOgEAPN.svg" width="48" height="48" alt="Cohere" />
+<img src="brand_logos/cohere_logo.png" width="48" height="48" alt="Cohere" />
 <br><strong>Cohere</strong>
 <br><sub>Neural Reranker</sub>
 </td>
