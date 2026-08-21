@@ -271,8 +271,12 @@ class MemoryStore:
 
     def hybrid_search(self, query: str, n_results: int = 4, memory_type: str = None) -> str:
         """
-        Executes Hybrid Search combining Dense Vector similarity (BGE-small) 
-        and Sparse Keyword matching (BM25Okapi) with Reciprocal Rank Fusion (RRF).
+        Two-Stage Hybrid Retrieval:
+          Stage 1 — Dense (BGE-small) + Sparse (BM25) fused via RRF to pool top candidates.
+          Stage 2 — Cohere Rerank API (rerank-english-v3.0) neurally scores each
+                    (query, document) pair for high-precision final ranking.
+
+        Falls back to pure RRF if COHERE_API_KEY is missing or the API call fails.
         """
         if not query or self.collection.count() == 0:
             return "No previous memories found."
@@ -325,29 +329,68 @@ class MemoryStore:
             )
             sparse_ids = [filtered_ids[i] for i in ranked_bm25_indices if bm25_scores[i] > 0]
 
-            # ── C. Reciprocal Rank Fusion (RRF) ──────────────────────────────
+            # ── C. Reciprocal Rank Fusion (RRF) — Stage 1 Pool ───────────────
             rrf_scores = {}
             k_constant = 60
 
-            # Rank scores from Dense Search
             for rank, mem_id in enumerate(dense_ids):
                 rrf_scores[mem_id] = rrf_scores.get(mem_id, 0.0) + (1.0 / (k_constant + rank + 1))
 
-            # Rank scores from Sparse Search
             for rank, mem_id in enumerate(sparse_ids):
                 rrf_scores[mem_id] = rrf_scores.get(mem_id, 0.0) + (1.0 / (k_constant + rank + 1))
 
-            # Sort candidate IDs by final RRF score
-            sorted_candidates = sorted(
+            # Pool top 15 RRF candidates for reranking (wider net for Stage 2)
+            rrf_pool_ids = sorted(
                 rrf_scores.keys(), key=lambda mem_id: rrf_scores[mem_id], reverse=True
-            )[:n_results]
+            )[:15]
 
-            if not sorted_candidates:
+            if not rrf_pool_ids:
                 return "No relevant memories found."
 
-            # ── D. Format Output ─────────────────────────────────────────────
+            # ── D. Stage 2 — Cohere Rerank ────────────────────────────────────
+            # Sends the top RRF candidates to Cohere's neural cross-encoder.
+            # Falls back to RRF ranking if the API key is missing or the call fails.
+            import httpx
+            cohere_api_key = os.getenv("COHERE_API_KEY", "")
+            final_candidates = rrf_pool_ids[:n_results]  # Default fallback: pure RRF
+
+            if cohere_api_key:
+                try:
+                    candidate_texts = [record_map[mid][0] for mid in rrf_pool_ids]
+                    rerank_response = httpx.post(
+                        "https://api.cohere.com/v1/rerank",
+                        headers={
+                            "Authorization": f"Bearer {cohere_api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": "rerank-english-v3.0",
+                            "query": query,
+                            "documents": candidate_texts,
+                            "top_n": n_results,
+                        },
+                        timeout=5.0,
+                    )
+                    rerank_response.raise_for_status()
+                    rerank_data = rerank_response.json()
+
+                    # Map Cohere's ranked indices back to our candidate IDs
+                    reranked_results = rerank_data.get("results", [])
+                    if reranked_results:
+                        final_candidates = [
+                            rrf_pool_ids[r["index"]]
+                            for r in reranked_results
+                            if r.get("index") is not None and r["index"] < len(rrf_pool_ids)
+                        ]
+                        print(f"[MemoryStore] Cohere reranked {len(reranked_results)} candidates.")
+                except Exception as e:
+                    print(f"[MemoryStore] Warning: Cohere rerank failed, using RRF fallback: {e}")
+            else:
+                print("[MemoryStore] No COHERE_API_KEY set, using RRF-only ranking.")
+
+            # ── E. Format Output ─────────────────────────────────────────────
             formatted = []
-            for mem_id in sorted_candidates:
+            for mem_id in final_candidates:
                 doc, meta = record_map[mem_id]
                 ts = meta.get("timestamp", "Unknown time")[:10]
                 m_type = meta.get("memory_type", "memory").upper()
@@ -360,6 +403,7 @@ class MemoryStore:
 
         except Exception as e:
             return f"Error executing hybrid memory search: {e}"
+
 
     def search_memories(self, query: str, n_results: int = 4) -> str:
         """Searches long-term memories using Hybrid Search (Dense + BM25 RRF)."""
