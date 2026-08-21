@@ -119,7 +119,6 @@ graph TD
     end
 
     subgraph MemoryWrite [Write Path - After Every Turn]
-        direction TB
         EpisodicMerge["Phase 1: Episodic Merge<br/>Qwen 3.6 27B<br/>Single-doc LLM Upsert"]
         SemanticExtract["Phase 2: Semantic Extraction<br/>Gemini 3.6 Flash JSON Mode<br/>Fact Diff + Conflict Resolution"]
         ChromaDB[(ChromaDB Long-Term Memory)]
@@ -128,7 +127,6 @@ graph TD
     end
 
     subgraph MemoryRead [Read Path - On Demand]
-        direction TB
         BM25[BM25 Sparse Search]
         Dense[BGE-small Dense Search]
         RRF["RRF Fusion<br/>top-15 pool"]
@@ -158,7 +156,7 @@ graph TD
     Summary --> Out([Voice Output])
 
     classDef llm fill:#f55036,stroke:#fff,stroke-width:2px,color:#fff
-    classDef node fill:#009688,stroke:#fff,stroke-width:2px,color:#fff
+    classDef execnode fill:#009688,stroke:#fff,stroke-width:2px,color:#fff
     classDef mcp fill:#3776AB,stroke:#fff,stroke-width:2px,color:#fff
     classDef mem fill:#6929C4,stroke:#fff,stroke-width:2px,color:#fff
     classDef qwen fill:#6B21A8,stroke:#fff,stroke-width:2px,color:#fff
@@ -167,7 +165,7 @@ graph TD
     classDef fusion fill:#166534,stroke:#fff,stroke-width:2px,color:#fff
 
     class Planner,Summary llm
-    class ToolNode node
+    class ToolNode execnode
     class read_resume,search_web,search_past_memories mcp
     class ChromaDB,SQLite mem
     class EpisodicMerge qwen
@@ -175,6 +173,7 @@ graph TD
     class CohereNode cohere
     class RRF fusion
 ```
+
 
 ### 🧠 Dual Memory — How It Works
 
