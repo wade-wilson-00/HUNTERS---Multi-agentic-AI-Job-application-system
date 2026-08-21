@@ -91,7 +91,10 @@ We recently rebuilt Hunter's voice pipeline from the ground up into a highly sca
 ### 🔥 Key Optimizations & Fixes
 - **Client-Side Edge TTS:** TTS generation was moved from the server directly to the client. This cuts out an entire network hop, meaning Hunter starts speaking the very millisecond the first sentence is generated!
 - **Asynchronous Concurrent Playback:** Utilizing pure `asyncio` and `miniaudio`, the audio stream buffers and plays chunks concurrently as they download, preventing deadlocks and buffering lag.
-- **Groq LLM Acceleration:** Switched to Groq's high-speed inference for Llama 3.1, making the AI's "thought process" nearly instantaneous.
+- **Qwen 3.6 27B Planner:** Switched from Llama 3.1 8B to Qwen 3.6 27B as the Planner LLM, delivering significantly stronger ReAct reasoning and tool-call accuracy for complex multi-step career tasks.
+- **LLM-Powered Episodic Merge:** Hunter's episodic memory now uses Qwen 3.6 27B to intelligently merge each new session into a single evolving document, preventing ChromaDB bloat and preserving full context history without duplication.
+- **Gemini Semantic Fact Extraction:** Every conversation turn is processed by Gemini 3.6 Flash (JSON mode) to extract structured user facts (skills, goals, location, preferences) and automatically delete any contradicted or stale data.
+- **Cohere Neural Reranking:** Memory retrieval upgraded from single-stage RRF to a two-stage pipeline — RRF pools 15 candidates, then Cohere's `rerank-english-v3.0` cross-encoder scores each pair and returns only the most relevant results.
 - **VAD Processing Lock:** The microphone now intelligently mutes itself (`is_processing`) while Hunter is processing and speaking, eliminating the dreaded "one-word mid-sentence reset" bug.
 - **3D Pixel UI:** Built a gorgeous custom 3D drop-shadow CLI interface natively into Rich, replacing standard fonts.
 
@@ -209,7 +212,7 @@ summary_node
               → Writes only genuinely new facts to ChromaDB
 ```
 
-**Why this matters for you:** Hunter never stores stale data. If you say *"I've moved to Dubai"*, Qwen/Gemini automatically removes your old Karachi location fact and stores the new one — no manual correction needed.
+**Why this matters for you:** Hunter never stores stale data. If you say *"I've moved to Bangalore"*, Qwen/Gemini automatically removes your old Mumbai location fact and stores the new one — no manual correction needed.
 
 ### 🔎 Read Path — Two-Stage Retrieval (On Demand)
 
