@@ -56,8 +56,8 @@ class MemoryStore:
 
         On every turn this method:
           1. Queries ChromaDB for an existing summary for this session_id.
-          2. If found  → calls hunter_llm to MERGE the new turn into the existing summary.
-          3. If absent → calls hunter_llm to generate a fresh summary of the first turn.
+          2. If found  → calls llm to MERGE the new turn into the existing summary.
+          3. If absent → calls llm to generate a fresh summary of the first turn.
           4. Upserts the result under a stable doc ID `ep_{session_id}`,
              so only ONE episodic document exists per session — zero overlap.
 
@@ -67,7 +67,7 @@ class MemoryStore:
             return
 
         # ── Lazy import to prevent circular dependency ────────────────────────
-        from agents.graphs.groq_llm import hunter_llm
+        from sub_agents.gemini_client import gemini_llm
 
         doc_id = f"ep_{session_id}"
         new_turn_text = (
@@ -105,14 +105,24 @@ class MemoryStore:
                 f"CONVERSATION TURN:\n{new_turn_text}"
             )
 
-        # ── 3. Call LLM for summarization ─────────────────────────────────────
+        # ── 3. Call Gemini 3.6 Flash for summarization ────────────────────────
         try:
-            from langchain_core.messages import HumanMessage
-            llm_response = await hunter_llm.ainvoke([HumanMessage(content=prompt)])
-            summary_text = llm_response.content.strip()
+            import asyncio
+            gemini = gemini_llm(json_mode=False, temperature=0.2)
+            response = await asyncio.to_thread(gemini.generate_content, prompt)
+            summary_text = response.text.strip()
         except Exception as e:
-            print(f"[MemoryStore] Warning: LLM summarization failed, falling back to raw text: {e}")
-            summary_text = new_turn_text
+            print(f"[MemoryStore] Gemini failed ({e}). Trying Qwen backup...")
+
+            try:
+                from agents.graphs.groq_llm import hunter_llm
+                from langchain_core.messages import HumanMessage
+
+                llm_response = await hunter_llm.ainvoke([HumanMessage(content=prompt)])
+                summary_text = llm_response.content.strip()
+            except Exception as e2:
+                 print(f"[MemoryStore] Both models failed. Skipping Upserting: {e2}")
+                 return
 
         if not summary_text:
             return
@@ -165,9 +175,7 @@ class MemoryStore:
             return
 
         import json
-        import google.generativeai as genai
-
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
+        from sub_agents.gemini_client import gemini_llm
 
         # ── 1. Fetch existing semantic facts ──────────────────────────────────
         existing_facts: list[dict] = []
@@ -214,17 +222,11 @@ class MemoryStore:
             "}"
         )
 
-        # ── 3. Call Gemini 2.5 Flash in JSON mode ─────────────────────────────
+        # ── 3. Call Gemini 3.6 Flash in JSON mode ─────────────────────────────
         try:
-            model = genai.GenerativeModel(
-                model_name="gemini-3.6-flash",
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1,          # Low temp for deterministic extraction
-                    max_output_tokens=512,
-                ),
-            )
-            result = model.generate_content(prompt)
+            import asyncio
+            gemini = gemini_llm(json_mode=True, temperature=0.1)
+            result = await asyncio.to_thread(gemini.generate_content, prompt)
             raw_text = result.text.strip()
             # Clean potential Markdown codeblock wrapping
             if raw_text.startswith("```"):
