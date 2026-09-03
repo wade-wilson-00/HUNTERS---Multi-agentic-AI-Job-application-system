@@ -23,7 +23,7 @@ async def scout_node(state: HunterState) -> dict:
     scout_llm = gemini_llm(json_mode=True, temperature=0.3)
    
     role_info = target_role if target_role else "Use the Targeted role from Candidate's Resume"
-    base_query = f"{target_role or ''} {task_instructions or ''}".strip()
+    base_query = task_instructions.strip() if task_instructions else target_role.strip()
     
     queries = [
         f"{base_query}",
@@ -35,7 +35,7 @@ async def scout_node(state: HunterState) -> dict:
     for q in queries:
         try:
             print(f"[Scout Agent] Running web search for query: '{q}'...", flush=True)
-            results = web_search.search_web(query=q, max_results=3)
+            results = web_search.search_web(query=q, max_results=6)
             search_snippets.append(results)
         except Exception as e:
             print(f"[Scout Agent] Warning: Search failed: {e} for '{q}'", flush=True)
@@ -48,9 +48,9 @@ async def scout_node(state: HunterState) -> dict:
     CANDIDATE RESUME SUMMARY:
     {cached_resume[:1200]}
     RAW SEARCH RESULTS:
-    {combined_results[:4000]}
+    {combined_results[:12000]}
     TASK:
-    Extract up to 5 of the top most relevant, active job/internship listings from the raw search results above.
+    Extract up to 15 of the top most relevant, active job/internship listings from the raw search results above.
     Set "total_found" to the number of job objects in the "jobs" array.
     Ensure all quotes inside strings are validly escaped so the JSON is strictly valid.
     Return ONLY a JSON object matching this exact schema:
