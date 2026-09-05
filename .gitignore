@@ -10,6 +10,7 @@ workspace_profie/*
 !workspace_profie/.gitkeep
 
 .data/
-workspace/reports
+workspace/*
+workspace/.gitkeep
 
 

@@ -18,9 +18,9 @@ async def scout_node(state: HunterState) -> dict:
 
     #Call the read_resume MCP tool if cached resume doesn't exist
     if not cached_resume:
-        cached_resume = resume_read.resume_read()
+        cached_resume = resume_read.read_resume()
     
-    scout_llm = gemini_llm(json_mode=True, temperature=0.3)
+    scout_llm = gemini_llm(json_mode=True, temperature=0.6)
    
     role_info = target_role if target_role else "Use the Targeted role from Candidate's Resume"
     base_query = task_instructions.strip() if task_instructions else target_role.strip()
