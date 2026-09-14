@@ -44,6 +44,7 @@ class MatchDetail(BaseModel):
     job_id: str
     company: str
     role: str
+    url: Optional[str] = Field(default=None, description="Job application or listing URL")
     fit_score: int = Field(ge=0, le=100, description="Compatibility score 0-100")
     matching_skills: List[str] = Field(default_factory=list, description="Skills the user already has")
     missing_skills: List[str] = Field(default_factory=list, description="Skills the user is missing")
@@ -66,12 +67,24 @@ class ApplicationResult(BaseModel):
     job_id: str
     company: str
     role: str
+    url: str 
+    ats_platform: Optional[str]
+    form_fields_filled: int
     status: str = Field(description="SUBMITTED | AWAITING_APPROVAL | FAILED")
     confirmation_screenshot: Optional[str] = Field(default=None, description="Path to screenshot if captured")
     notes: str = Field(default="", description="Any issues or details about the submission")
 
 
+class ApplicationBatchResult(BaseModel):
+    """Structured output from the Application Agent for batch job applications."""
+    total_attempted: int
+    total_submitted: int
+    applications: List[ApplicationResult] = Field(default_factory=list)
+    report_path: Optional[str] = Field(default=None, description="Path to saved application_report.md")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
+
 # 4. TRACKER AGENT — Application Status Logging
 # ═══════════════════════════════════════════════════════════════════════════════
 

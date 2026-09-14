@@ -23,10 +23,20 @@ def gemini_llm(json_mode: bool = False, temperature: float = 0.2):
                 max_output_tokens=4096,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
             )
-            return client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt,
-                config=config,
-            )
+            candidate_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash"]
+            for model_name in candidate_models:
+                try:
+                    return client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=config,
+                    )
+                except Exception as e:
+                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                        print(f"[GeminiClient] Model {model_name} rate-limited. Trying fallback model...")
+                        continue
+                    raise e
+            raise RuntimeError("All available Gemini models exceeded rate limits.")
+
 
     return GeminiWrapper()

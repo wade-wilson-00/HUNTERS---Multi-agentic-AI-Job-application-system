@@ -64,9 +64,15 @@ async def match_node(state: HunterState) -> dict:
         match_agent_response = json.loads(response.text)
 
         if "ranked_jobs" in match_agent_response:
+            job_url_map = {j.get("job_id"): j.get("url", "") for j in jobs}
+            for rj in match_agent_response["ranked_jobs"]:
+                if not rj.get("url"):
+                    rj["url"] = job_url_map.get(rj.get("job_id"), "")
+
             match_agent_response["ranked_jobs"].sort(
-                key=lambda x: x.get("fit_score",0),
-                reverse = True )
+                key=lambda x: x.get("fit_score", 0),
+                reverse=True
+            )
         match_result = MatchResult(**match_agent_response)
 
     except Exception as e:

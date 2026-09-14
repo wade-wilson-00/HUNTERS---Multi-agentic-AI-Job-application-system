@@ -2,12 +2,18 @@ venv
 .env
 roadmap.md
 temp_audio.wav
-__pychache__
+__pycache__/
+*.py[cod]
 Dockerfile
 pipeline_evolution.md
 
-workspace_profie/*
-!workspace_profie/.gitkeep
+workspace_profile/*
+!workspace_profile/.gitkeep
+
+workspace/reports/*
+workspace/screenshots/*
+application_report.md
+
 
 .data/
 workspace/*

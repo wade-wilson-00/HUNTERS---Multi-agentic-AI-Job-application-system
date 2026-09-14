@@ -26,9 +26,9 @@ async def scout_node(state: HunterState) -> dict:
     base_query = task_instructions.strip() if task_instructions else target_role.strip()
     
     queries = [
-        f"{base_query}",
-        f"{base_query} Hiring",
-        f"{base_query} site:linkedin.com/jobs".strip()
+        f"{base_query} site:boards.greenhouse.io",
+        f"{base_query} site:jobs.lever.co OR site:ashbyhq.com",
+        f"{base_query} hiring application career"
     ]
 
     search_snippets = []
@@ -42,17 +42,23 @@ async def scout_node(state: HunterState) -> dict:
     
     combined_results = "\n\n".join(search_snippets)
 
-    #Detailed Context for LLM
+    # Detailed Context for LLM
     prompt = f"""
-    You are Hunter's Scout Agent, you are an expert Job Search strategist and responsible for searching high relevant jobs based on User's profile.
+    You are Hunter's Scout Agent, an expert Job Search strategist responsible for finding active, apply-able job openings matching the candidate's profile.
+    
     CANDIDATE RESUME SUMMARY:
     {cached_resume[:1200]}
+    
     RAW SEARCH RESULTS:
     {combined_results[:12000]}
-    TASK:
-    Extract up to 15 of the top most relevant, active job/internship listings from the raw search results above.
-    Set "total_found" to the number of job objects in the "jobs" array.
-    Ensure all quotes inside strings are validly escaped so the JSON is strictly valid.
+    
+    CRITICAL RULES FOR EXTRACTING JOB LISTINGS:
+    1. DIRECT APPLICATION URLS ONLY: Extract URLs that point to a SPECIFIC individual job posting (e.g. boards.greenhouse.io/<company>/jobs/<id>, jobs.lever.co/<company>/<id>, jobs.ashbyhq.com/<company>/<id>, or direct company job application pages).
+    2. NEVER RETURN AGGREGATOR OR SEARCH DIRECTORY URLS: Strictly avoid generic search result URLs such as `indeed.com/q-...`, `wellfound.com/role/...`, `naukri.com/...-jobs`, or `google.com`. Every listing MUST have an individual, apply-able job URL.
+    3. NO DUPLICATE URLS: Each job listing in the "jobs" array must have a distinct, unique URL.
+    4. Extract up to 10-15 of the top most relevant, active job listings.
+    5. Set "total_found" to the number of job objects in the "jobs" array.
+
     Return ONLY a JSON object matching this exact schema:
     {{
       "query_used": "{queries[0]}",
