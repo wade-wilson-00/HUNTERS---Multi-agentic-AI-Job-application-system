@@ -1,5 +1,3 @@
-<div align="center">
-
 ```
 ██   ██  ██   ██  ███   ██  ████████  ███████   ██████    ███████ 
 ██   ██  ██   ██  ████  ██     ██     ██        ██   ██   ██      
@@ -10,27 +8,7 @@
 
 ### _Your AI-Powered Career Operating System_
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/Playwright-Browser_Automation-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
-  <img src="https://img.shields.io/badge/FastAPI-WebSockets-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/Groq-Inference-f55036?style=for-the-badge&logo=groq&logoColor=white" alt="Groq" />
-  <img src="https://img.shields.io/badge/Qwen-3.6_27B_Planner-6B21A8?style=for-the-badge&logo=alibabadotcom&logoColor=white" alt="Qwen" />
-  <img src="https://img.shields.io/badge/Gemini-3.5_Flash_Memory-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Gemini" />
-  <img src="https://img.shields.io/badge/Cohere-Neural_Reranker-D97706?style=for-the-badge" alt="Cohere" />
-  <img src="https://img.shields.io/badge/Sarvam_AI-STT-FF9900?style=for-the-badge" alt="Sarvam AI" />
-  <img src="https://img.shields.io/badge/FastMCP-Tooling-blue?style=for-the-badge" alt="FastMCP" />
-  <img src="https://img.shields.io/badge/LangGraph-Agent_Loop-green?style=for-the-badge" alt="LangGraph" />
-  <img src="https://img.shields.io/badge/ChromaDB-Vector_Memory-E85D04?style=for-the-badge" alt="ChromaDB" />
-  <img src="https://img.shields.io/badge/BGE--small--en-Embeddings-6929C4?style=for-the-badge" alt="BGE" />
-  <img src="https://img.shields.io/badge/SQLite-State_Persistence-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
-  <img src="https://img.shields.io/badge/Rich-CLI_UI-4B0082?style=for-the-badge&logo=gnometerminal&logoColor=white" alt="Rich" />
-</p>
-
 _A hyper-optimized, voice-enabled AI system that listens to you, understands your career goals, and autonomously hunts for job opportunities — like having J.A.R.V.I.S. as your personal career advisor._
-
-</div>
-
 
 ---
 
@@ -245,6 +223,75 @@ Query: "What are my Python skills and job preferences?"
 
 ## 🛠️ Tech Stack
 
+<table>
+<tr>
+<td align="center" width="120">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg" width="48" height="48" alt="Python" />
+<br><strong>Python</strong>
+<br><sub>3.12+</sub>
+</td>
+<td align="center" width="120">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/fastapi/fastapi-original.svg" width="48" height="48" alt="FastAPI" />
+<br><strong>FastAPI</strong>
+<br><sub>WS Server</sub>
+</td>
+<td align="center" width="120">
+<img src="brand_logos/langgraph.png" width="48" height="48" alt="LangGraph" />
+<br><strong>LangGraph</strong>
+<br><sub>Agent Orchestration</sub>
+</td>
+<td align="center" width="120">
+<img src="brand_logos/Model_Context_Protocol_logo-removebg-preview.png" width="48" height="48" alt="MCP" />
+<br><strong>FastMCP</strong>
+<br><sub>Stdio Tool Server</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="120">
+<img src="brand_logos/qwen_logo.png" width="48" height="48" alt="Qwen" />
+<br><strong>Qwen</strong>
+<br><sub>3.6 27B Planner LLM</sub>
+</td>
+<td align="center" width="120">
+<img src="https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg" width="48" height="48" alt="Gemini" />
+<br><strong>Gemini</strong>
+<br><sub>3.6 Flash Memory AI</sub>
+</td>
+<td align="center" width="120">
+<img src="brand_logos/cohere_logo.png" width="48" height="48" alt="Cohere" />
+<br><strong>Cohere</strong>
+<br><sub>Neural Reranker</sub>
+</td>
+<td align="center" width="120">
+<img src="brand_logos/groq.png" width="48" height="48" alt="Groq" />
+<br><strong>Groq</strong>
+<br><sub>LLM Inference</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="120">
+<img src="brand_logos/sarvam-removebg-preview.png" width="48" height="48" alt="Sarvam AI" />
+<br><strong>Sarvam AI</strong>
+<br><sub>Ultra-fast STT</sub>
+</td>
+<td align="center" width="120">
+<img src="brand_logos/edge-removebg-preview.png" width="48" height="48" alt="Microsoft Edge" />
+<br><strong>Edge TTS</strong>
+<br><sub>Streaming Neural TTS</sub>
+</td>
+<td align="center" width="120">
+<img src="brand_logos/richlogo_py_wide_featured-removebg-preview.png" width="90" height="48" alt="Rich" />
+<br><strong>Rich</strong>
+<br><sub>CLI UI</sub>
+</td>
+<td align="center" width="120">
+<img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" width="48" height="48" alt="BAAI BGE" />
+<br><strong>BGE-small-en</strong>
+<br><sub>384-dim Embeddings</sub>
+</td>
+</tr>
+</table>
+
 ---
 
 ## 📦 Project Structure
@@ -458,30 +505,29 @@ Hardened Hunter's entire memory system against token rate limits, infinite tool 
 
 #### 🏹 Multi-Agent Orchestration — Phase 4: Sub-Agent Rollout (Week 5)
 
-| Feature                            | Status | Description                                                                                                                                                                                                                                                |
-| ---------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shared Gemini Client               | ✅ Done | Created `sub_agents/gemini_client.py` with multi-model fallback (`gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.6-flash`) for resilient, high-throughput sub-agent operations.                                                                    |
-| Pydantic Schema Bus                | ✅ Done | Built `sub_agents/schemas.py` defining strict output schemas for all sub-agents (`ScoutResult`, `MatchResult`, `ApplicationResult`, `ApplicationBatchResult`, `TrackerResult`, `MarketAnalysisResult`, `OutreachResult`).                                    |
-| `HunterState` Inter-Agent Bus      | ✅ Done | Updated `HunterState` with dedicated state slots (`scout_data`, `match_data`, `application_data`, etc.) to pass Pydantic dumps seamlessly between nodes.                                                                                                   |
-| **Scout Agent** (`scout.py`)       | ✅ Done | 1-call architecture: Python constructs dynamic ATS queries (`boards.greenhouse.io`, `jobs.lever.co`, `ashbyhq.com`) → Tavily runs web searches → Gemini extracts direct job listings into `ScoutResult` → Generates `workspace/reports/scout_report.md`.  |
-| **Match Agent** (`match.py`)       | ✅ Done | 1-call architecture: Evaluates resume against Scout listings using a 3-tier hierarchy (40% Experience & Seniority, 35% Tech Stack, 25% Domain Alignment) → Calculates 0–100 fit scores, skill gaps & verdicts → Saves `workspace/reports/match_report.md`. |
+| Feature                            | Status | Description                                                                                                                                                                                                                                                        |
+| ---------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Shared Gemini Client               | ✅ Done | Created `sub_agents/gemini_client.py` with multi-model fallback (`gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.6-flash`) for resilient, high-throughput sub-agent operations.                                                                             |
+| Pydantic Schema Bus                | ✅ Done | Built `sub_agents/schemas.py` defining strict output schemas for all sub-agents (`ScoutResult`, `MatchResult`, `ApplicationResult`, `ApplicationBatchResult`, `TrackerResult`, `MarketAnalysisResult`, `OutreachResult`).                                          |
+| `HunterState` Inter-Agent Bus      | ✅ Done | Updated `HunterState` with dedicated state slots (`scout_data`, `match_data`, `application_data`, etc.) to pass Pydantic dumps seamlessly between nodes.                                                                                                           |
+| **Scout Agent** (`scout.py`)       | ✅ Done | 1-call architecture: Python constructs dynamic ATS queries (`boards.greenhouse.io`, `jobs.lever.co`, `ashbyhq.com`) → Tavily runs web searches → Gemini extracts direct job listings into `ScoutResult` → Generates `workspace/reports/scout_report.md`.           |
+| **Match Agent** (`match.py`)       | ✅ Done | 1-call architecture: Evaluates resume against Scout listings using a 3-tier hierarchy (40% Experience & Seniority, 35% Tech Stack, 25% Domain Alignment) → Calculates 0–100 fit scores, skill gaps & verdicts → Saves `workspace/reports/match_report.md`.         |
 | **Apply Agent** (`apply_agent.py`) | ✅ Done | Hybrid DOM extraction (JS) + LLM Form-Fill Planning (Gemini) + Playwright automated filling (inputs, dropdowns, resume PDF upload) + Human-in-the-Loop (HITL) review checkpoint + confirmation screenshot & markdown evidence reporting (`application_report.md`). |
-| Smart ATS Traversal & Validation   | ✅ Done | Automatic Lever `/apply` URL normalization, dynamic "Apply Now" button detection, and candidate application form validation (`is_valid_application_form`) to discard search aggregator portals.                                                           |
-| Dual LLM Circuit-Breaker           | ✅ Done | Upgraded `context/memory_store.py` with a robust fallback pipeline: Gemini primary → Qwen 3.6 27B (`hunter_llm`) backup → skip upsert if both fail.                                                                                                        |
+| Smart ATS Traversal & Validation   | ✅ Done | Automatic Lever `/apply` URL normalization, dynamic "Apply Now" button detection, and candidate application form validation (`is_valid_application_form`) to discard search aggregator portals.                                                                    |
+| Dual LLM Circuit-Breaker           | ✅ Done | Upgraded `context/memory_store.py` with a robust fallback pipeline: Gemini primary → Qwen 3.6 27B (`hunter_llm`) backup → skip upsert if both fail.                                                                                                                |
 
 ---
 
 ### 📌 Upcoming
 
-| Sprint / Week | Milestone | Description |
-|---|---|---|
-| **Week 6 (Next Sprint)** | **Tracker Agent & UI Overhaul** | **1. Tracker Agent (`tracker.py`):** Application status logging, spreadsheet/Markdown ledger, and lifecycle state management (`APPLIED \| INTERVIEWING \| REJECTED \| OFFER`).<br/>**2. Prompt Caching:** Applying prompt caching for static system directives, resume text, and context builder layers to dramatically cut latency and token consumption.<br/>**3. UI Overhaul:** Changing and upgrading the UI of HUNTERS for visual excellence, interactive review cards, and real-time agent observability. |
-| **Week 7** | **Market Analyzer & Outreach** | Skill gap roadmapping, salary benchmarking, and personalized recruiter outreach generation. |
-| **Week 8** | **Fully Autonomous Voice Orchestration** | Autonomous scheduling, overnight hunts, and end-to-end voice control across the entire agent swarm. |
+| Sprint / Week            | Milestone                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Week 6 (Next Sprint)** | **Tracker Agent & UI Overhaul**          | **1. Tracker Agent (`tracker.py`):** Application status logging, spreadsheet/Markdown ledger, and lifecycle state management (`APPLIED \| INTERVIEWING \| REJECTED \| OFFER`).**2. Prompt Caching:** Applying prompt caching for static system directives, resume text, and context builder layers to dramatically cut latency and token consumption.**3. UI Overhaul:** Changing and upgrading the UI of HUNTERS for visual excellence, interactive review cards, and real-time agent observability. |
+| **Week 7**               | **Market Analyzer & Outreach**           | Skill gap roadmapping, salary benchmarking, and personalized recruiter outreach generation.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Week 8**               | **Fully Autonomous Voice Orchestration** | Autonomous scheduling, overnight hunts, and end-to-end voice control across the entire agent swarm.                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ---
 
 **Built with 🤍 and a dream of never manually applying to jobs again.**
 
 _"Good evening, sir. Shall I begin the hunt?"_ — Hunter 🏹
-
