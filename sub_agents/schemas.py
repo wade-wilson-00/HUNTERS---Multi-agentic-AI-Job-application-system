@@ -70,7 +70,7 @@ class ApplicationResult(BaseModel):
     url: str 
     ats_platform: Optional[str]
     form_fields_filled: int
-    status: str = Field(description="SUBMITTED | AWAITING_APPROVAL | FAILED")
+    status: str = Field(description="SUBMITTED | AWAITING_APPROVAL | FAILED | NEEDS_MANUAL_APPLY")
     confirmation_screenshot: Optional[str] = Field(default=None, description="Path to screenshot if captured")
     notes: str = Field(default="", description="Any issues or details about the submission")
 

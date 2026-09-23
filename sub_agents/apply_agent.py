@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from pathlib import Path
 from typing import Optional, List
@@ -91,77 +92,99 @@ If any field is not found in the resume, set its value to an empty string "".
 
 # ── Step 3: DOM Extractor ────────────────────────────────────────────────────
 
+_FIELD_EXTRACTION_JS = """
+() => {
+    const elements = document.querySelectorAll('input, textarea, select');
+    const fields = [];
+    const seenSelectors = new Set();
+
+    elements.forEach(el => {
+        // Filter out non-fillable or invisible field types
+        const skipTypes = ['hidden', 'submit', 'button', 'reset', 'image', 'checkbox', 'radio'];
+        if (skipTypes.includes(el.type)) return;
+        if (el.offsetParent === null) return;  // Skip invisible elements
+
+        // Build best unique CSS selector
+        let selector = null;
+        if (el.id) {
+            selector = '#' + el.id;
+        } else if (el.name) {
+            selector = '[name="' + el.name + '"]';
+        } else if (el.getAttribute('data-testid')) {
+            selector = '[data-testid="' + el.getAttribute('data-testid') + '"]';
+        }
+
+        if (!selector) return;
+        if (seenSelectors.has(selector)) return;
+        seenSelectors.add(selector);
+
+        // Find best human-readable label
+        let label = '';
+        if (el.id) {
+            const labelEl = document.querySelector('label[for="' + el.id + '"]');
+            if (labelEl) label = labelEl.innerText.trim();
+        }
+        if (!label) label = el.getAttribute('aria-label') || '';
+        if (!label) label = el.placeholder || '';
+        if (!label) label = el.name || '';
+
+        const tagName = el.tagName.toLowerCase();
+        let type = tagName === 'input' ? (el.type || 'text') : tagName;
+
+        fields.push({
+            label:       label,
+            selector:    selector,
+            type:        type,
+            required:    el.required || false,
+            placeholder: el.placeholder || ''
+        });
+    });
+
+    return fields;
+}
+"""
+
+
+async def _extract_fields_from_frame(frame) -> list[dict]:
+    """Runs field extraction JS inside a single Playwright frame."""
+    try:
+        return await frame.evaluate(_FIELD_EXTRACTION_JS) or []
+    except Exception:
+        return []
+
+
 async def extract_form_fields(page) -> list[dict]:
     """
-    DOM Extractor — runs a JS script inside the live browser page to extract
-    only meaningful, interactive form fields. Returns a clean list of dicts
-    ready to be passed to the LLM form-fill planner.
+    Multi-Frame DOM Extractor.
+    Scans the main frame AND all embedded iframes (common on Greenhouse custom
+    domains, SmartRecruiters, etc.) to find interactive form fields.
+    Returns a deduplicated list of field dicts ready for the LLM planner.
     """
+    all_fields: list[dict] = []
+    seen_selectors: set = set()
 
-    js_script = """
-    () => {
-        const elements = document.querySelectorAll('input, textarea, select');
-        const fields = [];
-        const seenSelectors = new Set();
+    # Scroll to bottom first to trigger any lazy-loaded React/Vue form components
+    try:
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await page.wait_for_timeout(1000)
+        await page.evaluate("window.scrollTo(0, 0)")
+        await page.wait_for_timeout(500)
+    except Exception:
+        pass
 
-        elements.forEach(el => {
-            // Filter out non-fillable or invisible field types
-            const skipTypes = ['hidden', 'submit', 'button', 'reset', 'image', 'checkbox', 'radio'];
-            if (skipTypes.includes(el.type)) return;
-            if (el.offsetParent === null) return;  // Skip hidden/invisible elements
+    # Collect from main frame + all child frames (handles embedded ATS iframes)
+    frames_to_check = [page] + list(page.frames)
+    for frame in frames_to_check:
+        frame_fields = await _extract_fields_from_frame(frame)
+        for field in frame_fields:
+            sel = field.get("selector", "")
+            if sel and sel not in seen_selectors:
+                seen_selectors.add(sel)
+                all_fields.append(field)
 
-            // Build the best unique CSS selector for this element
-            let selector = null;
-            if (el.id) {
-                selector = '#' + el.id;
-            } else if (el.name) {
-                selector = '[name="' + el.name + '"]';
-            } else if (el.getAttribute('data-testid')) {
-                selector = '[data-testid="' + el.getAttribute('data-testid') + '"]';
-            }
-
-            // Skip if we can't reliably target this element
-            if (!selector) return;
-
-            // Skip duplicates (e.g. mobile/desktop duplicate fields)
-            if (seenSelectors.has(selector)) return;
-            seenSelectors.add(selector);
-
-            // Find the best human-readable label for this field
-            let label = '';
-            if (el.id) {
-                const labelEl = document.querySelector('label[for="' + el.id + '"]');
-                if (labelEl) label = labelEl.innerText.trim();
-            }
-            // Fallbacks if no <label for="..."> was found
-            if (!label) label = el.getAttribute('aria-label') || '';
-            if (!label) label = el.placeholder || '';
-            if (!label) label = el.name || '';
-
-            // Determine element type
-            const tagName = el.tagName.toLowerCase();
-            let type = tagName === 'input' ? (el.type || 'text') : tagName;
-
-            fields.push({
-                label:       label,
-                selector:    selector,
-                type:        type,
-                required:    el.required || false,
-                placeholder: el.placeholder || ''
-            });
-        });
-
-        return fields;
-    }
-    """
-
-    # Run the JS inside the live browser, returns a Python list of dicts
-    raw_fields = await page.evaluate(js_script)
-
-    # Post-processing in Python: cap at 20 fields to keep LLM prompt lean
-    fields = raw_fields[:20]
-
-    print(f"[ApplyAgent] DOM Extractor: found {len(raw_fields)} fields, using top {len(fields)}.")
+    # Cap at 20 fields to keep LLM prompt lean
+    fields = all_fields[:20]
+    print(f"[ApplyAgent] DOM Extractor: found {len(all_fields)} fields across {len(frames_to_check)} frame(s), using top {len(fields)}.")
     return fields
 
 
@@ -317,14 +340,14 @@ async def hitl_checkpoint(job: dict, fill_plan: list[dict], filled_count: int, a
     total_planned = len(fill_plan)
 
     print("\n" + "═" * 70)
-    print(" 🛑 HUMAN-IN-THE-LOOP (HITL) CHECKPOINT — REVIEW BEFORE SUBMISSION")
+    print("REVIEW BEFORE SUBMISSION")
     print("═" * 70)
-    print(f" 🏢 Company : {company}")
-    print(f" 💼 Role    : {role}")
-    print(f" 🔗 URL     : {url}")
-    print(f" 📝 Fields  : {filled_count}/{total_planned} fields successfully filled")
+    print(f" Company : {company}")
+    print(f" Role    : {role}")
+    print(f" URL     : {url}")
+    print(f" Fields  : {filled_count}/{total_planned} fields successfully filled")
     print("─" * 70)
-    print(" 📋 Form Fill Summary:")
+    print("Form Fill Summary:")
     for entry in fill_plan[:10]:
         selector = entry.get("selector", "")
         val = str(entry.get("value", ""))
@@ -443,7 +466,13 @@ def generate_application_report(batch: ApplicationBatchResult) -> str:
 
     if batch.applications:
         for idx, app in enumerate(batch.applications, 1):
-            status_icon = "✅" if app.status == "SUBMITTED" else ("⏸️" if app.status == "AWAITING_APPROVAL" else "❌")
+            _status_icons = {
+                "SUBMITTED": "✅",
+                "AWAITING_APPROVAL": "⏸️",
+                "NEEDS_MANUAL_APPLY": "🔗",
+                "FAILED": "❌",
+            }
+            status_icon = _status_icons.get(app.status, "❓")
             lines.append(f"### {idx}. {app.role} — {app.company}")
             lines.append(f"- **Job ID:** `{app.job_id}`")
             lines.append(f"- **URL:** [{app.url}]({app.url})")
@@ -514,12 +543,35 @@ async def apply_node(state: HunterState) -> dict:
 
     async with async_playwright() as p:
         try:
-            browser = await p.chromium.launch(headless=headless_mode)
+            browser = await p.chromium.launch(
+                headless=headless_mode,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-web-security",
+                ]
+            )
         except Exception:
-            # Fallback to headless if display server is unavailable
             browser = await p.chromium.launch(headless=True)
 
-        context = await browser.new_context(viewport={"width": 1280, "height": 900})
+        # Stealth context: realistic user-agent + headers to bypass bot-detection
+        context = await browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            },
+            java_script_enabled=True,
+        )
+        # Mask navigator.webdriver to avoid trivial bot detection
+        await context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        )
         page = await context.new_page()
 
         # 5. Iterate through filtered jobs
@@ -554,9 +606,33 @@ async def apply_node(state: HunterState) -> dict:
                 continue
 
             try:
-                # Normalize Lever URLs: if on a lever.co job page without /apply, target /apply
-                if "jobs.lever.co" in url.lower() and not url.lower().endswith("/apply"):
-                    url = url.rstrip("/") + "/apply"
+                # Normalize Lever URLs:
+                # Only append /apply if URL points to a specific job (has a UUID segment).
+                # Company board roots like jobs.lever.co/levelai (no UUID) are NOT valid — skip them.
+                if "jobs.lever.co" in url.lower():
+                    _parts = [p for p in url.rstrip("/").split("/") if p]
+                    _uuid_pattern = re.compile(
+                        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.I
+                    )
+                    _has_uuid = any(_uuid_pattern.match(p) for p in _parts)
+                    if not _has_uuid:
+                        # This is a company board root, not a specific posting
+                        print(f"[ApplyAgent] Lever URL is a company directory root (no job UUID). Marking as NEEDS_MANUAL_APPLY: {url}")
+                        results.append(
+                            ApplicationResult(
+                                job_id=job_id,
+                                company=company,
+                                role=role,
+                                url=url,
+                                ats_platform=ats_platform,
+                                form_fields_filled=0,
+                                status="NEEDS_MANUAL_APPLY",
+                                notes="Scout returned a company board root URL instead of a specific job posting. Open the link manually to apply."
+                            )
+                        )
+                        continue
+                    elif not url.lower().endswith("/apply"):
+                        url = url.rstrip("/") + "/apply"
 
                 print(f"\n[ApplyAgent] Navigating to {company} — {role} ({url})...")
                 await page.goto(url, timeout=30000, wait_until="domcontentloaded")
@@ -601,7 +677,30 @@ async def apply_node(state: HunterState) -> dict:
                         is_valid, validation_msg = is_valid_application_form(fields)
 
                 if not is_valid:
-                    print(f"[ApplyAgent] Form validation: {validation_msg} ({url})")
+                    print(f"[ApplyAgent] Form validation failed: {validation_msg} ({url})")
+                    # Determine whether this is a recoverable case or a hard failure
+                    # If 200 status + no fields -> likely needs SSO/CAPTCHA/manual login -> NEEDS_MANUAL_APPLY
+                    # If 404 or timeout -> FAILED
+                    page_url_lower = page.url.lower()
+                    is_error_page = any(x in (await page.title()).lower() for x in ["not found", "404", "error", "unavailable"])
+                    try:
+                        http_status = (await page.evaluate("() => window.performance.getEntriesByType('navigation')[0]?.responseStatus || 200"))
+                    except Exception:
+                        http_status = 200
+
+                    if is_error_page or http_status in (404, 410):
+                        recovery_status = "FAILED"
+                        recovery_notes = f"{validation_msg} (Page returned HTTP {http_status} or error page — job may be closed/expired.)"
+                    else:
+                        # Page loaded OK but form is embedded, gated, or deferred — save for manual review
+                        recovery_status = "NEEDS_MANUAL_APPLY"
+                        recovery_notes = (
+                            f"{validation_msg} "
+                            "Page loaded successfully but no fillable form was found — "
+                            "may require SSO login, CAPTCHA, or is rendered inside a protected iframe. "
+                            "Please apply manually using the URL above."
+                        )
+
                     results.append(
                         ApplicationResult(
                             job_id=job_id,
@@ -610,8 +709,8 @@ async def apply_node(state: HunterState) -> dict:
                             url=url,
                             ats_platform=ats_platform,
                             form_fields_filled=0,
-                            status="FAILED",
-                            notes=validation_msg
+                            status=recovery_status,
+                            notes=recovery_notes
                         )
                     )
                     continue
